@@ -2,6 +2,10 @@ github.com/0x434D53/openinbrowser v0.0.0-20160118155317-0d855441189c h1:I0xoHksX
 github.com/0x434D53/openinbrowser v0.0.0-20160118155317-0d855441189c/go.mod h1:V1gmsjkKQe+MoGQ2uRpC5MmvtE6ojGkXQ7lZxuuncew=
 github.com/julienschmidt/httprouter v1.3.0 h1:U0609e9tgbseu3rBINet9P48AI/D3oJs4dN7jwJOQ1U=
 github.com/julienschmidt/httprouter v1.3.0/go.mod h1:JR6WtHb+2LUe8TCKY3cZOxFyyO8IZAc4RVcycCCAKdM=
+github.com/streadway/amqp v1.0.0 h1:kuuDrUJFZL1QYL9hUNuCxNObNzB0bV/ZG5jV3RWAQgo=
+github.com/streadway/amqp v1.0.0/go.mod h1:AZpEONHx3DKn8O/DFsRAY58/XVQiIPMTMB1SddzLXVw=
+gitlab.com/aycd-inc/autosolve-clients/autosolve-client-go v0.0.0-20200821180405-cb59ed064f31 h1:M2kUSExWZ51EzWQ2gW4tnSQTIRwo6lb3Y9m6473G/M8=
+gitlab.com/aycd-inc/autosolve-clients/autosolve-client-go v0.0.0-20200821180405-cb59ed064f31/go.mod h1:sREyK6tPtUCZMRLZ9LGBaVUgMKEHE6IeNwuJnB73qrM=
 golang.org/x/net v0.0.0-20210226172049-e18ecbb05110 h1:qWPm9rbaAMKs8Bq/9LRpbMqxWRVUAQwMI9fVrssnTfw=
 golang.org/x/net v0.0.0-20210226172049-e18ecbb05110/go.mod h1:m0MpNAwzfU5UDzcl9v0D8zg8gWTRqZa9RBIspLL5mdg=
 golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
