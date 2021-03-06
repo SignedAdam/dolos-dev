@@ -18,7 +18,7 @@ func New() *Webshop {
 }
 
 func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL) (bool, bool, *structs.CaptchaWrapper, error) {
-	body, err := helperfuncs.GetBodyHTML(productURL.URL)
+	body, err := helperfuncs.GetBodyHTML(productURL.URL, "", "", "", "")
 	if err != nil {
 		fmt.Println(fmt.Errorf("Failed to get body (%v)", err))
 	}

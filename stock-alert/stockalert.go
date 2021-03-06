@@ -1,11 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,8 +15,6 @@ import (
 	"adam/learn-gitlab/pkg/helperfuncs"
 	"adam/learn-gitlab/pkg/structs"
 	"adam/learn-gitlab/pkg/switcher"
-
-	"golang.org/x/net/html"
 )
 
 type StockAlertHandler struct {
@@ -33,21 +30,12 @@ func main() {
 	productURLs, err := helperfuncs.LoadState()
 	if err != nil {
 		fmt.Println(fmt.Errorf("Failed to read config %v", err.Error()))
+		return
 	}
 
 	handler := StockAlertHandler{
 		ProductURLs:   productURLs,
 		CaptchaSolver: make(map[string]*structs.CaptchaWrapper),
-	}
-
-	err = helperfuncs.CreateSessionHTML("daddadd", "https://images-na.ssl-images-amazon.com/captcha/qujzzelu/Captcha_sylmyxtxkg.jpg")
-	if err != nil {
-		fmt.Println(fmt.Errorf("Failed create captcha solver HTML file (%v)", err))
-	}
-
-	err = helperfuncs.OpenInBrowser("captchatemplates/daddadd.html") //captchaData.SessionID
-	if err != nil {
-		fmt.Println(fmt.Errorf("Failed to open browser (%v)", err))
 	}
 
 	fmt.Println(fmt.Sprintf("Configurations file loaded. %v product config(s) found.", len(handler.ProductURLs)))
@@ -142,13 +130,6 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 	}
 }
 
-func renderNode(n *html.Node) string {
-	var buf bytes.Buffer
-	w := io.Writer(&buf)
-	html.Render(w, n)
-	return buf.String()
-}
-
 func (handler *StockAlertHandler) CaptchaSolverHandler(w http.ResponseWriter, r *http.Request) {
 	captchaChars := r.FormValue("captchachars")
 	if captchaChars == "" {
@@ -171,28 +152,48 @@ func (handler *StockAlertHandler) CaptchaSolverHandler(w http.ResponseWriter, r 
 }
 
 func (handler *StockAlertHandler) Test(w http.ResponseWriter, r *http.Request) {
-	body, err := helperfuncs.GetBodyHTML(handler.ProductURLs[0].URL)
+	//getIP(w, r)
+	IPAddress := r.Header.Get("X-Real-Ip")
+	if IPAddress == "" {
+		IPAddress = r.Header.Get("X-Forwarded-For")
+	}
+	if IPAddress == "" {
+		IPAddress = r.RemoteAddr
+	}
+
+	/*forwarded := r.Header.Get("X-FORWARDED-FOR")
+	if forwarded == "" {
+		fmt.Fprint(w, "no")
+	}*/
+
+	fmt.Println("hello " + IPAddress)
+	fmt.Fprint(w, "hello "+IPAddress)
+}
+
+func getIP(w http.ResponseWriter, req *http.Request) {
+	fmt.Fprintf(w, "<h1>static file server</h1><p><a href='./static'>folder</p></a>")
+
+	ip, port, err := net.SplitHostPort(req.RemoteAddr)
 	if err != nil {
-		logAndWriteResponse(w, "Failed to get html %v", http.StatusBadRequest, err.Error())
+		//return nil, fmt.Errorf("userip: %q is not IP:port", req.RemoteAddr)
+
+		fmt.Fprintf(w, "userip: %q is not IP:port", req.RemoteAddr)
+	}
+
+	userIP := net.ParseIP(ip)
+	if userIP == nil {
+		//return nil, fmt.Errorf("userip: %q is not IP:port", req.RemoteAddr)
+		fmt.Fprintf(w, "userip: %q is not IP:port", req.RemoteAddr)
 		return
 	}
-	/*
-		if url == "" {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			fmt.Fprint(w, )
-			return
-		}
-	*/
+	// This will only be defined when site is accessed via non-anonymous proxy
+	// and takes precedence over RemoteAddr
+	// Header.Get is case-insensitive
+	forward := req.Header.Get("X-Forwarded-For")
 
-	doc, err := html.Parse(body)
-	if err != nil {
-		fmt.Println(fmt.Sprintf("Failed to parse body into a html document (%v)", err))
-		return
-	}
-	newBody := renderNode(doc)
-	w.Header().Set("Content-Type", "text/html")
-
-	fmt.Fprint(w, newBody)
+	fmt.Fprintf(w, "<p>IP: %s</p>", ip)
+	fmt.Fprintf(w, "<p>Port: %s</p>", port)
+	fmt.Fprintf(w, "<p>Forwarded for: %s</p>", forward)
 }
 
 //CreateProductURLHandler handles the creation of a new team
@@ -243,3 +244,27 @@ func logAndWriteResponse(w http.ResponseWriter, format string, statusCode int, p
 	w.WriteHeader(statusCode)
 	fmt.Fprintf(w, format, params...)
 }
+
+/*
+func test() {
+	time.Sleep(3 * time.Second)
+	fmt.Println("testing")
+	//134.209.29.120:8080
+	bodyRead, err := helperfuncs.GetBodyHTML("http://80.201.214.15:3077/api/test", "136.233.215.137", "80", "", "") //"184.82.224.74", "1080"
+	if err != nil {
+		fmt.Println(fmt.Errorf("Failed to get body %v", err.Error()))
+		return
+	}
+
+	defer bodyRead.Close()
+	bytes, err := ioutil.ReadAll(bodyRead)
+	if err != nil {
+		fmt.Println(fmt.Errorf("Failed to read body %v", err.Error()))
+		return
+	}
+
+	fmt.Println(string(bytes))
+	fmt.Println("done testing")
+	return
+}
+*/
