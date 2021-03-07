@@ -14,3 +14,7 @@ type CaptchaWrapper struct {
 	Solved       bool
 	CaptchaChars string
 }
+
+type GlobalConfig struct {
+	StockCheckInterval int `json:"stock_check_interval"`
+}

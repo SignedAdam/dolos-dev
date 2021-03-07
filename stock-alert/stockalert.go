@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,10 +16,13 @@ import (
 	"adam/learn-gitlab/pkg/switcher"
 )
 
+//StockAlertHandler represents an instance of this service
 type StockAlertHandler struct {
 	ProductURLs   []*structs.ProductURL
 	CaptchaSolver map[string]*structs.CaptchaWrapper
 	mutex         sync.RWMutex
+
+	globalConfig *structs.GlobalConfig
 }
 
 func main() {
@@ -29,19 +31,26 @@ func main() {
 
 	productURLs, err := helperfuncs.LoadState()
 	if err != nil {
-		fmt.Println(fmt.Errorf("Failed to read config %v", err.Error()))
+		fmt.Println(fmt.Errorf("Failed to read product configs %v", err.Error()))
+		return
+	}
+
+	globalConfig, err := helperfuncs.LoadGlobalConfig()
+	if err != nil {
+		fmt.Println(fmt.Errorf("Failed to read global settings config %v", err.Error()))
 		return
 	}
 
 	handler := StockAlertHandler{
 		ProductURLs:   productURLs,
 		CaptchaSolver: make(map[string]*structs.CaptchaWrapper),
+		globalConfig:  globalConfig,
 	}
 
 	fmt.Println(fmt.Sprintf("Configurations file loaded. %v product config(s) found.", len(handler.ProductURLs)))
 
 	for _, product := range handler.ProductURLs {
-		go handler.stockChecker(sigStopServerChan, *product)
+		go handler.stockChecker(sigStopServerChan, *product, globalConfig.StockCheckInterval)
 	}
 
 	//Initialize our REST API router & endpoints
@@ -58,7 +67,7 @@ func main() {
 	log.Println("server stopped")
 }
 
-func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal, productURL structs.ProductURL) {
+func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal, productURL structs.ProductURL, stockCheckInterval int) {
 	webshop, err := switcher.GetWebshop(productURL.URL)
 	if err != nil {
 		fmt.Println(fmt.Errorf("Failed to init webshop interface (%v)", err))
@@ -125,11 +134,12 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 				}
 			}
 
-			time.Sleep(10 * time.Second)
+			time.Sleep(time.Duration(stockCheckInterval) * time.Millisecond)
 		}
 	}
 }
 
+//CaptchaSolverHandler handles http requests for solving captcha
 func (handler *StockAlertHandler) CaptchaSolverHandler(w http.ResponseWriter, r *http.Request) {
 	captchaChars := r.FormValue("captchachars")
 	if captchaChars == "" {
@@ -151,8 +161,8 @@ func (handler *StockAlertHandler) CaptchaSolverHandler(w http.ResponseWriter, r 
 	logAndWriteResponse(w, "Captcha solved", http.StatusOK)
 }
 
+//Test huhuehue
 func (handler *StockAlertHandler) Test(w http.ResponseWriter, r *http.Request) {
-	//getIP(w, r)
 	IPAddress := r.Header.Get("X-Real-Ip")
 	if IPAddress == "" {
 		IPAddress = r.Header.Get("X-Forwarded-For")
@@ -168,32 +178,6 @@ func (handler *StockAlertHandler) Test(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("hello " + IPAddress)
 	fmt.Fprint(w, "hello "+IPAddress)
-}
-
-func getIP(w http.ResponseWriter, req *http.Request) {
-	fmt.Fprintf(w, "<h1>static file server</h1><p><a href='./static'>folder</p></a>")
-
-	ip, port, err := net.SplitHostPort(req.RemoteAddr)
-	if err != nil {
-		//return nil, fmt.Errorf("userip: %q is not IP:port", req.RemoteAddr)
-
-		fmt.Fprintf(w, "userip: %q is not IP:port", req.RemoteAddr)
-	}
-
-	userIP := net.ParseIP(ip)
-	if userIP == nil {
-		//return nil, fmt.Errorf("userip: %q is not IP:port", req.RemoteAddr)
-		fmt.Fprintf(w, "userip: %q is not IP:port", req.RemoteAddr)
-		return
-	}
-	// This will only be defined when site is accessed via non-anonymous proxy
-	// and takes precedence over RemoteAddr
-	// Header.Get is case-insensitive
-	forward := req.Header.Get("X-Forwarded-For")
-
-	fmt.Fprintf(w, "<p>IP: %s</p>", ip)
-	fmt.Fprintf(w, "<p>Port: %s</p>", port)
-	fmt.Fprintf(w, "<p>Forwarded for: %s</p>", forward)
 }
 
 //CreateProductURLHandler handles the creation of a new team
