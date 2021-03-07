@@ -43,7 +43,6 @@ func GetBodyHTML(rawURL string, proxyIP, proxyPort, proxyUser, proxyPassword str
 		return nil, fmt.Errorf("Failed to parse URL %s (%v)", rawURL, err)
 	}
 
-	fmt.Println(destURL.String())
 	//create HTTP request
 	req := &http.Request{
 		Method: "GET",

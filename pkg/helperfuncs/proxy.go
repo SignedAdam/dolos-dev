@@ -1,11 +1,13 @@
 package helperfuncs
 
 import (
+	"adam/learn-gitlab/pkg/structs"
 	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"golang.org/x/net/idna"
@@ -66,6 +68,19 @@ type proxyConfig struct {
 	// domainMatchers represent all values in the NoProxy that are a domain
 	// name or hostname & domain name
 	domainMatchers []matcher
+}
+
+//FindNextProxy finds the next valid proxy in the given list for the given webshop and returns it
+func FindNextProxy(proxies []*structs.Proxy, webshop structs.Webshop) (structs.Proxy, error) {
+
+	//find next suitable proxy
+	nextProxy := proxies[0]
+	if webshop == structs.WEBSHOP_AMAZON {
+
+	}
+	nextProxy.LastUsedAmazon = time.Now()
+
+	return *nextProxy, nil
 }
 
 func FromStr(proxyStr string) *Config {
