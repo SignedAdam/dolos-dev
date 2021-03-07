@@ -42,7 +42,7 @@ func main() {
 	fmt.Println(fmt.Sprintf("Configuration files loaded: \n\t%v product config(s) found \n\t%v proxies found \n\tstock check delay: %v", len(handler.ProductURLs), len(handler.Proxies), handler.GlobalConfig.StockCheckInterval))
 
 	for _, product := range handler.ProductURLs {
-		go handler.stockChecker(sigStopServerChan, *product, handler.GlobalConfig.StockCheckInterval)
+		handler.stockChecker(sigStopServerChan, *product, handler.GlobalConfig.StockCheckInterval)
 	}
 
 	//Initialize our REST API router & endpoints
