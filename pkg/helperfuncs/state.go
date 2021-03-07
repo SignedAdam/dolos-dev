@@ -20,7 +20,7 @@ func SaveState(products []*structs.ProductURL) error {
 	} //TODO: add an error check if there is an error but it's not os.IsNotExist
 
 	//marshal our URLs to json
-	prettyJSON, err := json.MarshalIndent(products, "", " ")
+	prettyJSON, err := json.MarshalIndent(products, "", "\t")
 	if err != nil {
 		return fmt.Errorf("Failed to pretty marshal Product URLs config to json (%v)", err)
 	}
@@ -35,37 +35,72 @@ func SaveState(products []*structs.ProductURL) error {
 }
 
 //LoadState populates the Product URLs config from a json file
-func LoadState() (productURLs []*structs.ProductURL, err error) {
+func LoadState(productURLs *[]*structs.ProductURL) (err error) {
 	_, err = os.Stat("stockalert-config/product-config.json")
 	if os.IsNotExist(err) {
 		//directory doesn't exist -> return nil
 
-		return nil, nil
+		return nil
 	}
 
 	//read json from file and unmarshal to our Product URLs config
 	jsonURLs, _ := ioutil.ReadFile("stockalert-config/product-config.json")
-	err = json.Unmarshal(jsonURLs, &productURLs)
+	err = json.Unmarshal(jsonURLs, productURLs)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to unmarshal json to Product URLs config (%v)", err)
+		return fmt.Errorf("Failed to unmarshal json to Product URLs config (%v)", err)
 	}
 
-	return productURLs, nil
+	return nil
 }
 
 //LoadGlobalConfig reads the global-config.json file and loads the necessary parameters
-func LoadGlobalConfig() (config *structs.GlobalConfig, err error) {
+func LoadGlobalConfig(config **structs.GlobalConfig) (err error) {
 	_, err = os.Stat("stockalert-config/global-config.json")
 	if os.IsNotExist(err) {
-		return nil, fmt.Errorf("global-config.json does not exist")
+		return fmt.Errorf("global-config.json does not exist")
 	}
 
 	//read json from file and unmarshal to global config struct
 	jsonURLs, _ := ioutil.ReadFile("stockalert-config/global-config.json")
 	err = json.Unmarshal(jsonURLs, &config)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to unmarshal json to global config (%v)", err)
+		return fmt.Errorf("Failed to unmarshal json to global config (%v)", err)
 	}
 
-	return config, nil
+	return nil
+}
+
+//LoadProxyConfigs reads the proxy-config.json file and loads all the proxies into a list
+func LoadProxyConfigs(proxies *[]*structs.Proxy) (err error) {
+	_, err = os.Stat("stockalert-config/proxy-config.json")
+	if os.IsNotExist(err) {
+		return nil
+	}
+
+	//read json from file and unmarshal to our proxies list
+	jsonURLs, _ := ioutil.ReadFile("stockalert-config/proxy-config.json")
+	err = json.Unmarshal(jsonURLs, proxies)
+	if err != nil {
+		return fmt.Errorf("Failed to unmarshal json to proxies list (%v)", err)
+	}
+
+	return nil
+}
+
+//LoadAllConfigs loads all necessary config files - this is just a helper function to avoid having to call every single config loader separately
+func LoadAllConfigs(productURLs *[]*structs.ProductURL, config **structs.GlobalConfig, proxies *[]*structs.Proxy) (err error) {
+	err = LoadState(productURLs)
+	if err != nil {
+		return err
+	}
+	err = LoadGlobalConfig(config)
+	if err != nil {
+		return err
+	}
+	err = LoadProxyConfigs(proxies)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

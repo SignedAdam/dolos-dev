@@ -9,11 +9,9 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 
 	"adam/learn-gitlab/pkg/helperfuncs"
 	"adam/learn-gitlab/pkg/structs"
-	"adam/learn-gitlab/pkg/switcher"
 )
 
 //StockAlertHandler represents an instance of this service
@@ -22,35 +20,29 @@ type StockAlertHandler struct {
 	CaptchaSolver map[string]*structs.CaptchaWrapper
 	mutex         sync.RWMutex
 
-	globalConfig *structs.GlobalConfig
+	GlobalConfig *structs.GlobalConfig
+	Proxies      []*structs.Proxy
 }
 
 func main() {
 	sigStopServerChan := make(chan os.Signal, 1)
 	signal.Notify(sigStopServerChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
-	productURLs, err := helperfuncs.LoadState()
-	if err != nil {
-		fmt.Println(fmt.Errorf("Failed to read product configs %v", err.Error()))
-		return
-	}
-
-	globalConfig, err := helperfuncs.LoadGlobalConfig()
-	if err != nil {
-		fmt.Println(fmt.Errorf("Failed to read global settings config %v", err.Error()))
-		return
-	}
-
 	handler := StockAlertHandler{
-		ProductURLs:   productURLs,
+		//ProductURLs:   productURLs,
 		CaptchaSolver: make(map[string]*structs.CaptchaWrapper),
-		globalConfig:  globalConfig,
+		//globalConfig:  globalConfig,
 	}
 
-	fmt.Println(fmt.Sprintf("Configurations file loaded. %v product config(s) found.", len(handler.ProductURLs)))
+	err := helperfuncs.LoadAllConfigs(&handler.ProductURLs, &handler.GlobalConfig, &handler.Proxies)
+	if err != nil {
+		fmt.Println(fmt.Errorf("Failed to read config files %v", err.Error()))
+		return
+	}
+	fmt.Println(fmt.Sprintf("Configuration files loaded: \n\t%v product config(s) found \n\t%v proxies found \n\tstock check delay: %v", len(handler.ProductURLs), len(handler.Proxies), handler.GlobalConfig.StockCheckInterval))
 
 	for _, product := range handler.ProductURLs {
-		go handler.stockChecker(sigStopServerChan, *product, globalConfig.StockCheckInterval)
+		go handler.stockChecker(sigStopServerChan, *product, handler.GlobalConfig.StockCheckInterval)
 	}
 
 	//Initialize our REST API router & endpoints
@@ -65,78 +57,6 @@ func main() {
 	http.ListenAndServe(":3077", mux)
 
 	log.Println("server stopped")
-}
-
-func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal, productURL structs.ProductURL, stockCheckInterval int) {
-	webshop, err := switcher.GetWebshop(productURL.URL)
-	if err != nil {
-		fmt.Println(fmt.Errorf("Failed to init webshop interface (%v)", err))
-	}
-
-	for {
-		select {
-		case <-sigStopServerChan:
-			//if the sigStopChan channel is signalled then we return from the function to kill the thread
-			fmt.Println("Exiting stockChecker thread")
-			return
-		default:
-
-			status, captcha, captchaData, err := webshop.CheckStockStatus(productURL)
-			if err != nil {
-				fmt.Println(fmt.Errorf("Failed to check stock for %s [URL: %s] (%v)", productURL.Name, productURL.URL, err))
-			}
-
-			if captcha {
-				fmt.Println("Captcha found")
-
-				if captchaData.CaptchaURL == "" {
-					fmt.Println(fmt.Errorf("Captcha does not have a URL"))
-
-				} else {
-					//put session key and captcha data into CaptchaSolverMap
-					handler.mutex.Lock()
-					handler.CaptchaSolver[captchaData.SessionID] = captchaData
-					handler.mutex.Unlock()
-
-					//open chrome to localhost:3077/api/captchasolver/[session_id]
-					helperfuncs.CreateSessionHTML(captchaData.SessionID, captchaData.CaptchaURL)
-					path := fmt.Sprintf("C:/Users/Vegeta/go/src/adam/learn-gitlab/%s.html", captchaData.SessionID)
-
-					err = helperfuncs.OpenInBrowser(path) //captchaData.SessionID
-					if err != nil {
-						fmt.Println(fmt.Errorf("Failed to open browser (%v)", err))
-						return
-					}
-
-					//wait for captcha to be solved
-					for {
-						handler.mutex.RLock()
-						solved := handler.CaptchaSolver[captchaData.SessionID].Solved
-						handler.mutex.RUnlock()
-						if solved {
-							fmt.Println("Captcha solved. Continuing...")
-							handler.mutex.Lock()
-							delete(handler.CaptchaSolver, captchaData.SessionID)
-							handler.mutex.Unlock()
-							break
-						}
-						time.Sleep(100 * time.Millisecond)
-					}
-
-					_ = captchaData
-				}
-
-			} else {
-				if status {
-					fmt.Println("Product ", productURL.Name, " is in stock!!!!!")
-				} else {
-					fmt.Println("Product ", productURL.Name, " sold out")
-				}
-			}
-
-			time.Sleep(time.Duration(stockCheckInterval) * time.Millisecond)
-		}
-	}
 }
 
 //CaptchaSolverHandler handles http requests for solving captcha
