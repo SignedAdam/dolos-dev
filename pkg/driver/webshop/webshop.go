@@ -5,5 +5,5 @@ import (
 )
 
 type Webshop interface {
-	CheckStockStatus(structs.ProductURL) (bool, bool, *structs.CaptchaWrapper, error)
+	CheckStockStatus(structs.ProductURL, structs.Proxy) (bool, bool, *structs.CaptchaWrapper, error)
 }

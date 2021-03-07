@@ -10,24 +10,33 @@ import (
 	"golang.org/x/net/html"
 )
 
+//Webshop represents an instance of this webshop driver
 type Webshop struct {
 }
 
+//New instantiates a new instance of this driver
 func New() *Webshop {
 	return &Webshop{}
 }
 
-func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL) (bool, bool, *structs.CaptchaWrapper, error) {
-	body, err := helperfuncs.GetBodyHTML(productURL.URL, "", "", "", "")
+//CheckStockStatus checks if a product is in stock on Amazon. Takes a ProductURL struct
+//returns:
+//bool inStock - boolean representing whether or not the item is in stock
+//bool captcha - boolan representing whether or not a captcha is returned on the page and needs to be solved to proceed
+//struct CaptchaWrapper - struct containing all the necessary information about a captcha if one is present
+//error - in case something goes wrong in the request
+func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy structs.Proxy) (bool, bool, *structs.CaptchaWrapper, error) {
+	body, err := helperfuncs.GetBodyHTML(productURL.URL, proxy.IP, proxy.Port, proxy.User, proxy.Password)
 	if err != nil {
 		fmt.Println(fmt.Errorf("Failed to get body (%v)", err))
+		return false, false, nil, err
 	}
 
 	inStock, captcha, captchaURL := checkStockStatus(body)
 
 	if captcha {
 		//generate session id
-		sessionID := "asbsdf"
+		sessionID := helperfuncs.GenerateRandomString(6)
 
 		captchaWrapper := &structs.CaptchaWrapper{
 			CaptchaURL: captchaURL,
@@ -92,6 +101,7 @@ func checkStockStatus(body io.ReadCloser) (bool, bool, string) {
 
 }
 
+//obsolete
 func findCaptchaURL(body io.ReadCloser) string {
 	var findElement func(*html.Node) string
 	findElement = func(n *html.Node) string {
