@@ -17,8 +17,8 @@ func New() (*CaptchaSolver, error) {
 	solver := &CaptchaSolver{
 		solvedTokens: make(map[string]chan string),
 	}
-	accessToken := ""
-	apiKey := ""
+	accessToken := "192703-457cc672-27ad-49c5-b415-fe3f111768af"
+	apiKey := "05e99354-c88c-4529-9cda-7b18d42e091d"
 
 	//init listener callbacks
 	var tokenListener autosolve.CaptchaTokenResponseListener = solver.handleResponse

@@ -48,6 +48,7 @@ func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy struc
 }
 
 func checkStockStatus(body io.ReadCloser) (bool, bool, string) {
+
 	var findElement func(*html.Node) (bool, bool, string)
 	findElement = func(n *html.Node) (bool, bool, string) {
 		if n.Type == html.ElementNode {
