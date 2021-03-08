@@ -29,9 +29,7 @@ func main() {
 	signal.Notify(sigStopServerChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	handler := StockAlertHandler{
-		//ProductURLs:   productURLs,
 		CaptchaSolver: make(map[string]*structs.CaptchaWrapper),
-		//globalConfig:  globalConfig,
 	}
 
 	err := helperfuncs.LoadAllConfigs(&handler.ProductURLs, &handler.GlobalConfig, &handler.Proxies)
@@ -39,10 +37,14 @@ func main() {
 		fmt.Println(fmt.Errorf("Failed to read config files %v", err.Error()))
 		return
 	}
-	fmt.Println(fmt.Sprintf("Configuration files loaded: \n\t%v product config(s) found \n\t%v proxies found \n\tstock check delay: %v", len(handler.ProductURLs), len(handler.Proxies), handler.GlobalConfig.StockCheckInterval))
+	fmt.Println(fmt.Sprintf("Configuration files loaded: \n\t%v product config(s) found \n\t%v proxies found", len(handler.ProductURLs), len(handler.Proxies)))
 
 	for _, product := range handler.ProductURLs {
-		handler.stockChecker(sigStopServerChan, *product, handler.GlobalConfig.StockCheckInterval)
+		for i := 0; i < product.Threads; i++ {
+			handler.mutex.Lock()
+			handler.stockChecker(sigStopServerChan, *product, *handler.GlobalConfig)
+			handler.mutex.Unlock()
+		}
 	}
 
 	//Initialize our REST API router & endpoints

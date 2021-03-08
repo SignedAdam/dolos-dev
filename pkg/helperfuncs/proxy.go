@@ -71,16 +71,31 @@ type proxyConfig struct {
 }
 
 //FindNextProxy finds the next valid proxy in the given list for the given webshop and returns it
-func FindNextProxy(proxies []*structs.Proxy, webshop structs.Webshop) (structs.Proxy, error) {
+func FindNextProxy(currentProxy *structs.Proxy, proxies []*structs.Proxy, webshopKind structs.Webshop, proxyLifetime int) (*structs.Proxy, error) {
+
+	if currentProxy != nil {
+		currentProxy.LastUsedAmazon = time.Now()
+		currentProxy.InUse = false
+	}
 
 	//find next suitable proxy
-	nextProxy := proxies[0]
-	if webshop == structs.WEBSHOP_AMAZON {
-
+	for _, proxy := range proxies {
+		if !proxy.InUse && getRelevantLastUsedTime(webshopKind, proxy).Add(time.Duration(proxyLifetime)*time.Minute).Before(time.Now()) {
+			proxy.LastUsedAmazon = time.Now()
+			proxy.InUse = true
+			return proxy, nil
+		}
 	}
-	nextProxy.LastUsedAmazon = time.Now()
+	return nil, fmt.Errorf("No suitable proxies found")
+}
 
-	return *nextProxy, nil
+func getRelevantLastUsedTime(webshopKind structs.Webshop, proxy *structs.Proxy) time.Time {
+	switch webshopKind {
+	case structs.WEBSHOP_AMAZON:
+		return proxy.LastUsedAmazon
+	}
+
+	return time.Now()
 }
 
 func FromStr(proxyStr string) *Config {

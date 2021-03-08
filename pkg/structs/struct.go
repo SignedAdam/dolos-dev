@@ -8,6 +8,7 @@ type ProductURL struct {
 	URL      string
 	MinPrice int `json:"min_price"`
 	MaxPrice int `json:"max_price"`
+	Threads  int
 }
 
 type CaptchaWrapper struct {
@@ -18,7 +19,9 @@ type CaptchaWrapper struct {
 }
 
 type GlobalConfig struct {
-	StockCheckInterval int `json:"stock_check_interval"`
+	AmazonStockCheckInterval          int `json:"amazon_stock_check_interval"`
+	AmazonStockCheckIntervalDeviation int `json:"amazon_stock_check_interval_deviation"`
+	AmazonProxyLifetime               int `json:"amazon_proxy_lifetime"`
 }
 
 type Proxy struct {
@@ -26,6 +29,7 @@ type Proxy struct {
 	Port           string
 	User           string
 	Password       string
+	InUse          bool
 	LastUsedAmazon time.Time
 }
 

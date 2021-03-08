@@ -5,28 +5,38 @@ import (
 	"adam/learn-gitlab/pkg/structs"
 	"adam/learn-gitlab/pkg/switcher"
 	"fmt"
+	"math/rand"
 	"os"
 	"time"
 )
 
-func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal, productURL structs.ProductURL, stockCheckInterval int) {
+func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal, productURL structs.ProductURL, globalConfig structs.GlobalConfig) {
 	webshop, webshopKind, err := switcher.GetWebshop(productURL.URL)
 	if err != nil {
 		fmt.Println(fmt.Errorf("Failed to init webshop interface (%v)", err))
 	}
-	/*
-		ProxyIP       string
-		ProxyPort     string
-		ProxyUser     string
-		ProxyPassword string
-		UseStart      time.Time
-	*/
+
+	var stockCheckInterval int
+	var globalProxyLifetime int
+	switch webshopKind {
+	case structs.WEBSHOP_AMAZON:
+		stockCheckInterval = globalConfig.AmazonStockCheckInterval
+		globalProxyLifetime = globalConfig.AmazonProxyLifetime
+	}
+
+	proxyLifecycle := true
+	if globalProxyLifetime == -1 {
+		proxyLifecycle = false
+	}
 	handler.mutex.RLock()
 	//find suitable proxy
-	proxy, err := helperfuncs.FindNextProxy(handler.Proxies, webshopKind)
+	proxy, err := helperfuncs.FindNextProxy(nil, handler.Proxies, webshopKind, globalProxyLifetime)
+	proxyCopy := *proxy
+	lastProxySet := time.Now()
 	handler.mutex.RUnlock()
 	if err != nil {
 		fmt.Println(fmt.Errorf("Failed to get next proxy for %s [URL: %s] (%v)", productURL.Name, productURL.URL, err))
+		return
 	}
 
 	for {
@@ -37,7 +47,7 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 			return
 		default:
 
-			status, captcha, captchaData, err := webshop.CheckStockStatus(productURL, proxy)
+			status, captcha, captchaData, err := webshop.CheckStockStatus(productURL, proxyCopy)
 			if err != nil {
 				fmt.Println(fmt.Errorf("Failed to check stock for %s [URL: %s] (%v)", productURL.Name, productURL.URL, err))
 			}
@@ -90,19 +100,23 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 				}
 
 				//check if proxy needs to be updated
-				//find next proxy
-				/*
-					handler.mutex.RLock()
-					//find suitable proxy
-					proxy, err := helperfuncs.FindNextProxy(handler.Proxies, webshopKind)
-					handler.mutex.RUnlock()
+				if lastProxySet.Add(time.Duration(globalProxyLifetime)*time.Minute).Before(time.Now()) && proxyLifecycle {
+					fmt.Print("\n==================================================\nchanging proxies from: " + proxyCopy.IP)
+					handler.mutex.Lock()
+					proxy, err = helperfuncs.FindNextProxy(proxy, handler.Proxies, webshopKind, globalProxyLifetime)
+					fmt.Print(" to " + proxy.IP + "\n==================================================\n")
+
+					proxyCopy = *proxy
+					handler.mutex.Unlock()
 					if err != nil {
 						fmt.Println(fmt.Errorf("Failed to get next proxy for %s [URL: %s] (%v)", productURL.Name, productURL.URL, err))
+						return
 					}
-				*/
+					lastProxySet = time.Now()
+				}
 			}
 
-			time.Sleep(time.Duration(stockCheckInterval) * time.Millisecond)
+			time.Sleep(time.Duration(stockCheckInterval+rand.Intn(globalConfig.AmazonStockCheckIntervalDeviation)) * time.Millisecond)
 		}
 	}
 }
