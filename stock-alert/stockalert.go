@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"adam/learn-gitlab/pkg/helperfuncs"
 	"adam/learn-gitlab/pkg/structs"
@@ -41,8 +42,9 @@ func main() {
 
 	for _, product := range handler.ProductURLs {
 		for i := 0; i < product.Threads; i++ {
+			time.Sleep(500 * time.Millisecond)
 			handler.mutex.Lock()
-			handler.stockChecker(sigStopServerChan, *product, *handler.GlobalConfig)
+			go handler.stockChecker(sigStopServerChan, *product, *handler.GlobalConfig)
 			handler.mutex.Unlock()
 		}
 	}
