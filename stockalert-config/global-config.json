@@ -1,5 +1,6 @@
 {
     "amazon_stock_check_interval": 1000,
     "amazon_stock_check_interval_deviation": 500,
-    "amazon_proxy_lifetime": 999999
+    "amazon_proxy_lifetime": 999999,
+    "captcha_solver_endpoint": "http://142.196.182.123:5000/solve"
 }

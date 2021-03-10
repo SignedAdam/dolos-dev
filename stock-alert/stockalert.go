@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	captchasolver "dolos-dev/pkg/driver/captcha/pysolver"
 	"dolos-dev/pkg/helperfuncs"
 	"dolos-dev/pkg/structs"
 )
@@ -35,10 +36,19 @@ func main() {
 
 	err := helperfuncs.LoadAllConfigs(&handler.ProductURLs, &handler.GlobalConfig, &handler.Proxies)
 	if err != nil {
-		fmt.Println(fmt.Errorf("Failed to read config files %v", err.Error()))
+		fmt.Println(fmt.Errorf("Failed to read config files (%v)", err.Error()))
 		return
 	}
 	fmt.Println(fmt.Sprintf("Configuration files loaded: \n\t%v product config(s) found \n\t%v proxies found", len(handler.ProductURLs), len(handler.Proxies)))
+
+	solution, err := captchasolver.SolveCaptcha("https://images-na.ssl-images-amazon.com/captcha/twhhswbk/Captcha_btitipgrme.jpg", handler.GlobalConfig.CaptchaSolverEndpoint)
+	if err != nil {
+		fmt.Println(fmt.Errorf("Failed to solve captcha (%v)", err.Error()))
+		return
+	}
+
+	fmt.Println("Captcha solved: ", solution)
+	return
 
 	for _, product := range handler.ProductURLs {
 		for i := 0; i < product.Threads; i++ {

@@ -53,7 +53,7 @@ func New() (*CaptchaSolver, error) {
 
 	return solver, nil
 }
-func (solver *CaptchaSolver) solveCaptcha(url string, responseToken chan string) error {
+func (solver *CaptchaSolver) SolveCaptcha(url string, responseToken chan string) error {
 
 	request := autosolve.CaptchaTokenRequest{
 		TaskId: helperfuncs.GenerateRandomString(10),
