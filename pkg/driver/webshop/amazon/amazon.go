@@ -1,8 +1,8 @@
 package amazon
 
 import (
-	"adam/learn-gitlab/pkg/helperfuncs"
-	"adam/learn-gitlab/pkg/structs"
+	"dolos-dev/pkg/helperfuncs"
+	"dolos-dev/pkg/structs"
 	"fmt"
 	"io"
 	"strings"

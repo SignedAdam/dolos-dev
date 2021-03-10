@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"adam/learn-gitlab/pkg/helperfuncs"
-	"adam/learn-gitlab/pkg/structs"
+	"dolos-dev/pkg/helperfuncs"
+	"dolos-dev/pkg/structs"
 )
 
 //StockAlertHandler represents an instance of this service

@@ -1,7 +1,7 @@
 package helperfuncs
 
 import (
-	"adam/learn-gitlab/pkg/structs"
+	"dolos-dev/pkg/structs"
 	"errors"
 	"fmt"
 	"net"

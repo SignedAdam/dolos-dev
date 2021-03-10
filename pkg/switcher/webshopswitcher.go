@@ -1,9 +1,9 @@
 package switcher
 
 import (
-	"adam/learn-gitlab/pkg/driver/webshop"
-	"adam/learn-gitlab/pkg/driver/webshop/amazon"
-	"adam/learn-gitlab/pkg/structs"
+	"dolos-dev/pkg/driver/webshop"
+	"dolos-dev/pkg/driver/webshop/amazon"
+	"dolos-dev/pkg/structs"
 	"fmt"
 	"strings"
 )

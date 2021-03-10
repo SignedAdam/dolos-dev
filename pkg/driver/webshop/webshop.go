@@ -1,7 +1,7 @@
 package webshop
 
 import (
-	"adam/learn-gitlab/pkg/structs"
+	"dolos-dev/pkg/structs"
 )
 
 type Webshop interface {

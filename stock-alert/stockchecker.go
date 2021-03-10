@@ -1,9 +1,9 @@
 package main
 
 import (
-	"adam/learn-gitlab/pkg/helperfuncs"
-	"adam/learn-gitlab/pkg/structs"
-	"adam/learn-gitlab/pkg/switcher"
+	"dolos-dev/pkg/helperfuncs"
+	"dolos-dev/pkg/structs"
+	"dolos-dev/pkg/switcher"
 	"fmt"
 	"math/rand"
 	"os"
@@ -66,7 +66,7 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 
 					//open chrome to localhost:3077/api/captchasolver/[session_id]
 					helperfuncs.CreateSessionHTML(captchaData.SessionID, captchaData.CaptchaURL)
-					path := fmt.Sprintf("C:/Users/Vegeta/go/src/adam/learn-gitlab/%s.html", captchaData.SessionID)
+					path := fmt.Sprintf("C:/Users/Vegeta/go/src/dolos-dev/%s.html", captchaData.SessionID)
 
 					err = helperfuncs.OpenInBrowser(path) //captchaData.SessionID
 					if err != nil {

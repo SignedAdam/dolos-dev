@@ -1,4 +1,4 @@
-module adam/learn-gitlab
+module dolos-dev
 
 go 1.16
 

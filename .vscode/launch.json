@@ -10,9 +10,9 @@
             "request": "launch",
             "mode": "auto",
             "program": "${fileDirname}",
-            "cwd": "C:/Users/Vegeta/go/src/adam/learn-gitlab/",
+            "cwd": "C:/Users/Vegeta/go/src/dolos-dev/",
             "env": {
-                "CAPTCHA_HTML_TEMPLATE_PATH": "C:/Users/Vegeta/go/src/adam/learn-gitlab/captchasolver.html"
+                "CAPTCHA_HTML_TEMPLATE_PATH": "C:/Users/Vegeta/go/src/dolos-dev/captchasolver.html"
             },
             "args": []
         }

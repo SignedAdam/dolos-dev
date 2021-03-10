@@ -1,7 +1,7 @@
 package aycd
 
 import (
-	"adam/learn-gitlab/pkg/helperfuncs"
+	"dolos-dev/pkg/helperfuncs"
 	"fmt"
 
 	"gitlab.com/aycd-inc/autosolve-clients/autosolve-client-go"
