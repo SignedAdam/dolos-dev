@@ -41,15 +41,6 @@ func main() {
 	}
 	fmt.Println(fmt.Sprintf("Configuration files loaded: \n\t%v product config(s) found \n\t%v proxies found", len(handler.ProductURLs), len(handler.Proxies)))
 
-	solution, err := captchasolver.SolveCaptcha("https://images-na.ssl-images-amazon.com/captcha/twhhswbk/Captcha_btitipgrme.jpg", handler.GlobalConfig.CaptchaSolverEndpoint)
-	if err != nil {
-		fmt.Println(fmt.Errorf("Failed to solve captcha (%v)", err.Error()))
-		return
-	}
-
-	fmt.Println("Captcha solved: ", solution)
-	return
-
 	for _, product := range handler.ProductURLs {
 		for i := 0; i < product.Threads; i++ {
 			time.Sleep(500 * time.Millisecond)
