@@ -104,14 +104,14 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 					fmt.Print("\n==================================================\nchanging proxies from: " + proxyCopy.IP)
 					handler.mutex.Lock()
 					proxy, err = helperfuncs.FindNextProxy(proxy, handler.Proxies, webshopKind, globalProxyLifetime)
-					fmt.Print(" to " + proxy.IP + "\n==================================================\n")
-
 					proxyCopy = *proxy
 					handler.mutex.Unlock()
 					if err != nil {
 						fmt.Println(fmt.Errorf("Failed to get next proxy for %s [URL: %s] (%v)", productURL.Name, productURL.URL, err))
 						return
 					}
+					fmt.Print(" to " + proxyCopy.IP + "\n==================================================\n")
+
 					lastProxySet = time.Now()
 				}
 			}
