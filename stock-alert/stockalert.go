@@ -53,7 +53,7 @@ func main() {
 	for _, product := range handler.ProductURLs {
 		for i := 0; i < product.Threads; i++ {
 			time.Sleep(500 * time.Millisecond)
-			//handler.mutex.Lock()
+			handler.mutex.Lock()
 			go handler.stockChecker(sigStopServerChan, *product, *handler.GlobalConfig)
 			handler.mutex.Unlock()
 		}
