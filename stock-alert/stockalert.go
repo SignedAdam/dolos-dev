@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	captchasolver "dolos-dev/pkg/driver/captcha/pysolver"
 	"dolos-dev/pkg/helperfuncs"
 	"dolos-dev/pkg/structs"
 )
