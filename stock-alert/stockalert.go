@@ -54,7 +54,7 @@ func main() {
 		for i := 0; i < product.Threads; i++ {
 			time.Sleep(500 * time.Millisecond)
 			//handler.mutex.Lock()
-			handler.stockChecker(sigStopServerChan, *product, *handler.GlobalConfig)
+			go handler.stockChecker(sigStopServerChan, *product, *handler.GlobalConfig)
 			handler.mutex.Unlock()
 		}
 	}

@@ -31,7 +31,7 @@ func New(sessionCount int, username, password string) (*SeleniumHandler, error) 
 	var wg sync.WaitGroup
 	for i := 0; i < sessionCount; i++ {
 		wg.Add(1)
-		seleniumHandler.createSession(&wg, i, structs.WEBSHOP_AMAZON, username, password)
+		go seleniumHandler.createSession(&wg, i, structs.WEBSHOP_AMAZON, username, password)
 	}
 	wg.Wait()
 
