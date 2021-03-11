@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	seleniumdriver "dolos-dev/pkg/driver/selenium"
 	"dolos-dev/pkg/helperfuncs"
 	"dolos-dev/pkg/structs"
 )
@@ -23,6 +24,8 @@ type StockAlertHandler struct {
 
 	GlobalConfig *structs.GlobalConfig
 	Proxies      []*structs.Proxy
+
+	seleniumHandler *seleniumdriver.SeleniumHandler
 }
 
 func main() {
@@ -35,16 +38,23 @@ func main() {
 
 	err := helperfuncs.LoadAllConfigs(&handler.ProductURLs, &handler.GlobalConfig, &handler.Proxies)
 	if err != nil {
-		fmt.Println(fmt.Errorf("Failed to read config files (%v)", err.Error()))
+		helperfuncs.Log("Failed to read config files (%v)", err.Error())
 		return
 	}
-	fmt.Println(fmt.Sprintf("Configuration files loaded: \n\t%v product config(s) found \n\t%v proxies found", len(handler.ProductURLs), len(handler.Proxies)))
+	helperfuncs.Log("Configuration files loaded: \n\t%v product config(s) found \n\t%v proxies found", len(handler.ProductURLs), len(handler.Proxies))
+
+	//TODO username and pass from globalconfig
+	seleniumHandler, err := seleniumdriver.New(1, "bkcourtsecrets@gmail.com", "t3chb0t")
+	if err != nil {
+		helperfuncs.Log("Failed to start selenium browser instances (%v)", err)
+	}
+	handler.seleniumHandler = seleniumHandler
 
 	for _, product := range handler.ProductURLs {
 		for i := 0; i < product.Threads; i++ {
 			time.Sleep(500 * time.Millisecond)
-			handler.mutex.Lock()
-			go handler.stockChecker(sigStopServerChan, *product, *handler.GlobalConfig)
+			//handler.mutex.Lock()
+			handler.stockChecker(sigStopServerChan, *product, *handler.GlobalConfig)
 			handler.mutex.Unlock()
 		}
 	}

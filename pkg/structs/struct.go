@@ -21,6 +21,7 @@ type CaptchaWrapper struct {
 type GlobalConfig struct {
 	AmazonStockCheckInterval          int    `json:"amazon_stock_check_interval"`
 	AmazonStockCheckIntervalDeviation int    `json:"amazon_stock_check_interval_deviation"`
+	AmazonUseProxies                  bool   `json:"amazon_use_proxies"`
 	AmazonProxyLifetime               int    `json:"amazon_proxy_lifetime"`
 	CaptchaSolverEndpoint             string `json:"captcha_solver_endpoint"`
 }
