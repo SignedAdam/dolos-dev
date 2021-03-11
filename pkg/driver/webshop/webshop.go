@@ -8,5 +8,7 @@ import (
 
 type Webshop interface {
 	CheckStockStatus(structs.ProductURL, structs.Proxy) (bool, bool, *structs.CaptchaWrapper, error)
-	LogInSelenium(string, string, selenium.WebDriver) error
+	GetKind() structs.Webshop
+	//LogInSelenium(string, string, selenium.WebDriver) error
+	Checkout(structs.ProductURL, selenium.WebDriver) error
 }

@@ -2,17 +2,18 @@ package selenium
 
 import (
 	"dolos-dev/pkg/driver/webshop"
+	amazonws "dolos-dev/pkg/driver/webshop/amazon"
+	"dolos-dev/pkg/structs"
 	"fmt"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/tebeka/selenium"
 )
 
 //SeleniumHandler is an instance of this driver that allows for interaction with the selenium interface
 type SeleniumHandler struct {
-	sessions []*Session
+	sessions map[structs.Webshop][]*Session
 	sync.RWMutex
 }
 
@@ -23,12 +24,14 @@ type Session struct {
 }
 
 //New creates a new instance of this driver
-func New(sessionCount int, webshop *webshop.Webshop, username, password string) (*SeleniumHandler, error) {
-	seleniumHandler := &SeleniumHandler{}
+func New(sessionCount int, username, password string) (*SeleniumHandler, error) {
+	seleniumHandler := &SeleniumHandler{
+		sessions: make(map[structs.Webshop][]*Session),
+	}
 	var wg sync.WaitGroup
 	for i := 0; i < sessionCount; i++ {
 		wg.Add(1)
-		go seleniumHandler.createSession(&wg, i, *webshop, username, password)
+		seleniumHandler.createSession(&wg, i, structs.WEBSHOP_AMAZON, username, password)
 	}
 	wg.Wait()
 
@@ -40,15 +43,27 @@ func New(sessionCount int, webshop *webshop.Webshop, username, password string) 
 	return seleniumHandler, nil
 }
 
-func (handler *SeleniumHandler) Checkout(webshop *webshop.Webshop) error {
+func (handler *SeleniumHandler) Checkout(webshop webshop.Webshop, product structs.ProductURL) error {
 
 	//refresh page
-	handler.sessions[0].webdriver.Refresh()
+	//handler.sessions[0].webdriver.Refresh()
+	session := handler.getInactiveSession(webshop.GetKind())
+	if session == nil {
+		return fmt.Errorf("No free sessions available to checkout product %s", product.Name)
+	}
 
+	err := webshop.Checkout(product, session.webdriver)
+	if err != nil {
+		return fmt.Errorf("Failed to checkout product %s (%v)", product.Name, err)
+	}
+
+	handler.Lock()
+	session.busy = false
+	handler.Unlock()
 	return nil
 }
 
-func (handler *SeleniumHandler) createSession(wg *sync.WaitGroup, id int, webshop webshop.Webshop, username, password string) {
+func (handler *SeleniumHandler) createSession(wg *sync.WaitGroup, id int, webshopKind structs.Webshop, username, password string) {
 	defer wg.Done()
 
 	var (
@@ -58,16 +73,16 @@ func (handler *SeleniumHandler) createSession(wg *sync.WaitGroup, id int, websho
 		port             = 8099 + id
 	)
 	opts := []selenium.ServiceOption{
-		//selenium.StartFrameBuffer(),             // Start an X frame buffer for the browser to run in.
-		selenium.ChromeDriver(chromeDriverPath), // Specify the path to GeckoDriver in order to use Firefox.
-		selenium.Output(os.Stderr),              // Output debug information to STDERR.
+		//selenium.StartFrameBuffer(),
+		selenium.ChromeDriver(chromeDriverPath),
+		selenium.Output(os.Stderr),
 	}
-	service, err := selenium.NewSeleniumService(seleniumPath, port, opts...)
+	_, err := selenium.NewSeleniumService(seleniumPath, port, opts...)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	defer service.Stop()
+	//defer service.Stop()
 
 	// Connect to the WebDriver instance running locally.
 	caps := selenium.Capabilities{"browserName": "chrome"}
@@ -77,17 +92,35 @@ func (handler *SeleniumHandler) createSession(wg *sync.WaitGroup, id int, websho
 		return
 	}
 
+	switch webshopKind {
+	case structs.WEBSHOP_AMAZON:
+		amazonws.LogInSelenium(username, password, wd)
+	}
 	newSession := &Session{
 		webdriver: wd,
 	}
+	handler.addSession(webshopKind, newSession)
+}
 
-	webshop.LogInSelenium(username, password, wd)
-
+func (handler *SeleniumHandler) addSession(webshopKind structs.Webshop, session *Session) {
 	handler.Lock()
-	handler.sessions = append(handler.sessions, newSession)
+	handler.sessions[webshopKind] = append(handler.sessions[webshopKind], session)
 	handler.Unlock()
 }
 
+func (handler *SeleniumHandler) getInactiveSession(webshopKind structs.Webshop) (session *Session) {
+	handler.RLock()
+	defer handler.RUnlock()
+	for _, session := range handler.sessions[webshopKind] {
+		if !session.busy {
+			session.busy = true
+			return session
+		}
+	}
+	return nil
+}
+
+/*
 func Test() {
 	const (
 		// These paths will be different on your system.
@@ -136,3 +169,4 @@ func Test() {
 
 	time.Sleep(20 * time.Second)
 }
+*/

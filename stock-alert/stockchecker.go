@@ -1,7 +1,6 @@
 package main
 
 import (
-	seleniumdriver "dolos-dev/pkg/driver/selenium"
 	"dolos-dev/pkg/helperfuncs"
 	"dolos-dev/pkg/structs"
 	"dolos-dev/pkg/switcher"
@@ -14,57 +13,60 @@ import (
 func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal, productURL structs.ProductURL, globalConfig structs.GlobalConfig) {
 	webshop, webshopKind, err := switcher.GetWebshop(productURL.URL)
 	if err != nil {
-		fmt.Println(fmt.Errorf("Failed to init webshop interface (%v)", err))
+		helperfuncs.Log("Failed to init webshop interface (%v)", err)
 	}
 
-	//TODO username and pass from globalconfig
-	seleniumHandler, err := seleniumdriver.New(1, &webshop, "", "")
-	if err != nil {
-		fmt.Println(fmt.Errorf("Failed to start selenium browser instance for this task (%v)", err))
-	}
-	_ = seleniumHandler
+	var (
+		stockCheckInterval  int
+		globalProxyLifetime int
+		useProxies          bool
+		proxyCopy           structs.Proxy = structs.Proxy{}
+		lastProxySet        time.Time
+		proxy               *structs.Proxy
+		proxyLifecycle      bool = false
+	)
 
-	var stockCheckInterval int
-	var globalProxyLifetime int
 	switch webshopKind {
 	case structs.WEBSHOP_AMAZON:
 		stockCheckInterval = globalConfig.AmazonStockCheckInterval
 		globalProxyLifetime = globalConfig.AmazonProxyLifetime
+		useProxies = globalConfig.AmazonUseProxies
 	}
 
-	proxyLifecycle := true
-	if globalProxyLifetime == -1 {
-		proxyLifecycle = false
-	}
-	handler.mutex.RLock()
-	//find suitable proxy
-	proxy, err := helperfuncs.FindNextProxy(nil, handler.Proxies, webshopKind, globalProxyLifetime)
-	proxyCopy := *proxy
-	lastProxySet := time.Now()
-	handler.mutex.RUnlock()
-	if err != nil {
-		fmt.Println(fmt.Errorf("Failed to get next proxy for %s [URL: %s] (%v)", productURL.Name, productURL.URL, err))
-		return
+	if useProxies {
+		if globalProxyLifetime > -1 {
+			proxyLifecycle = true
+		}
+		handler.mutex.RLock()
+		//find suitable proxy
+		proxy, err = helperfuncs.FindNextProxy(nil, handler.Proxies, webshopKind, globalProxyLifetime)
+		proxyCopy = *proxy
+		lastProxySet = time.Now()
+		handler.mutex.RUnlock()
+		if err != nil {
+			helperfuncs.Log("Failed to get next proxy for %s [URL: %s] (%v)", productURL.Name, productURL.URL, err)
+			return
+		}
 	}
 
 	for {
 		select {
 		case <-sigStopServerChan:
 			//if the sigStopChan channel is signalled then we return from the function to kill the thread
-			fmt.Println("Exiting stockChecker thread")
+			helperfuncs.Log("Exiting stockChecker thread")
 			return
 		default:
 
 			status, captcha, captchaData, err := webshop.CheckStockStatus(productURL, proxyCopy)
 			if err != nil {
-				fmt.Println(fmt.Errorf("Failed to check stock for %s [URL: %s] (%v)", productURL.Name, productURL.URL, err))
+				helperfuncs.Log("Failed to check stock for %s [URL: %s] (%v)", productURL.Name, productURL.URL, err)
 			}
 
 			if captcha {
-				fmt.Println("Captcha found")
+				helperfuncs.Log("Captcha found")
 
 				if captchaData.CaptchaURL == "" {
-					fmt.Println(fmt.Errorf("Captcha does not have a URL"))
+					helperfuncs.Log("Captcha does not have a URL")
 
 				} else {
 					//put session key and captcha data into CaptchaSolverMap
@@ -78,7 +80,7 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 
 					err = helperfuncs.OpenInBrowser(path) //captchaData.SessionID
 					if err != nil {
-						fmt.Println(fmt.Errorf("Failed to open browser (%v)", err))
+						helperfuncs.Log("Failed to open browser (%v)", err)
 						return
 					}
 
@@ -88,7 +90,7 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 						solved := handler.CaptchaSolver[captchaData.SessionID].Solved
 						handler.mutex.RUnlock()
 						if solved {
-							fmt.Println("Captcha solved. Continuing...")
+							helperfuncs.Log("Captcha solved. Continuing...")
 							handler.mutex.Lock()
 							delete(handler.CaptchaSolver, captchaData.SessionID)
 
@@ -103,26 +105,43 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 
 			} else {
 				if status {
-					fmt.Println(time.Now().String()+" Product ", productURL.Name, " is in stock!!!!!")
-				} else {
-					fmt.Println(time.Now().String()+" Product ", productURL.Name, " sold out")
-				}
-
-				//check if proxy needs to be updated
-				if lastProxySet.Add(time.Duration(globalProxyLifetime)*time.Minute).Before(time.Now()) && proxyLifecycle {
-					fmt.Print("\n==================================================\nchanging proxies from: " + proxyCopy.IP)
-					handler.mutex.Lock()
-					proxy, err = helperfuncs.FindNextProxy(proxy, handler.Proxies, webshopKind, globalProxyLifetime)
-					proxyCopy = *proxy
-					handler.mutex.Unlock()
+					helperfuncs.Log(fmt.Sprint("Product ", productURL.Name, " is in stock!!!!!"))
+					handler.mutex.RLock()
+					err = handler.seleniumHandler.Checkout(webshop, productURL)
+					handler.mutex.RUnlock()
 					if err != nil {
-						fmt.Println(fmt.Errorf("Failed to get next proxy for %s [URL: %s] (%v)", productURL.Name, productURL.URL, err))
-						return
+						helperfuncs.Log("Failed to buy %s (%v)", productURL.Name, err)
+					} else {
+						helperfuncs.Log("============")
+						helperfuncs.Log("HE BORGHT")
+						helperfuncs.Log("HE BORGHT")
+						helperfuncs.Log("HE BORGHT")
+						helperfuncs.Log("HE BORGHT")
+						helperfuncs.Log("HE BORGHT")
+						helperfuncs.Log("============")
 					}
-					fmt.Print(" to " + proxyCopy.IP + "\n==================================================\n")
-
-					lastProxySet = time.Now()
+				} else {
+					helperfuncs.Log(fmt.Sprint("Product ", productURL.Name, " sold out"))
 				}
+
+				if useProxies {
+					//check if proxy needs to be updated
+					if lastProxySet.Add(time.Duration(globalProxyLifetime)*time.Minute).Before(time.Now()) && proxyLifecycle {
+						helperfuncs.Log("\n==================================================\nchanging proxies from: " + proxyCopy.IP)
+						handler.mutex.Lock()
+						proxy, err = helperfuncs.FindNextProxy(proxy, handler.Proxies, webshopKind, globalProxyLifetime)
+						proxyCopy = *proxy
+						handler.mutex.Unlock()
+						if err != nil {
+							helperfuncs.Log("Failed to get next proxy for %s [URL: %s] (%v)", productURL.Name, productURL.URL, err)
+							return
+						}
+						helperfuncs.Log(" to " + proxyCopy.IP + "\n==================================================\n")
+
+						lastProxySet = time.Now()
+					}
+				}
+
 			}
 
 			time.Sleep(time.Duration(stockCheckInterval+rand.Intn(globalConfig.AmazonStockCheckIntervalDeviation)) * time.Millisecond)
