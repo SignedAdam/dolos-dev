@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	captchasolver "dolos-dev/pkg/driver/captcha/pysolver"
+	seleniumdriver "dolos-dev/pkg/driver/selenium"
 	"dolos-dev/pkg/helperfuncs"
 	"dolos-dev/pkg/structs"
 )
@@ -24,6 +24,8 @@ type StockAlertHandler struct {
 
 	GlobalConfig *structs.GlobalConfig
 	Proxies      []*structs.Proxy
+
+	seleniumHandler *seleniumdriver.SeleniumHandler
 }
 
 func main() {

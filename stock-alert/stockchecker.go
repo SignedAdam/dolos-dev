@@ -1,6 +1,7 @@
 package main
 
 import (
+	seleniumdriver "dolos-dev/pkg/driver/selenium"
 	"dolos-dev/pkg/helperfuncs"
 	"dolos-dev/pkg/structs"
 	"dolos-dev/pkg/switcher"
@@ -15,6 +16,13 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 	if err != nil {
 		fmt.Println(fmt.Errorf("Failed to init webshop interface (%v)", err))
 	}
+
+	//TODO username and pass from globalconfig
+	seleniumHandler, err := seleniumdriver.New(1, &webshop, "", "")
+	if err != nil {
+		fmt.Println(fmt.Errorf("Failed to start selenium browser instance for this task (%v)", err))
+	}
+	_ = seleniumHandler
 
 	var stockCheckInterval int
 	var globalProxyLifetime int
@@ -83,6 +91,7 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 							fmt.Println("Captcha solved. Continuing...")
 							handler.mutex.Lock()
 							delete(handler.CaptchaSolver, captchaData.SessionID)
+
 							handler.mutex.Unlock()
 							break
 						}
@@ -94,9 +103,9 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 
 			} else {
 				if status {
-					fmt.Println("Product ", productURL.Name, " is in stock!!!!!")
+					fmt.Println(time.Now().String()+" Product ", productURL.Name, " is in stock!!!!!")
 				} else {
-					fmt.Println("Product ", productURL.Name, " sold out")
+					fmt.Println(time.Now().String()+" Product ", productURL.Name, " sold out")
 				}
 
 				//check if proxy needs to be updated

@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/tebeka/selenium"
 	"golang.org/x/net/html"
 )
 
@@ -45,6 +46,64 @@ func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy struc
 		return false, true, captchaWrapper, nil
 	}
 	return inStock, false, nil, nil
+}
+
+//LogInSelenium logs in to Amazon with the given username & password using the given webdriver interface
+func (shop *Webshop) LogInSelenium(username, password string, webdriver selenium.WebDriver) error {
+
+	//navigate to sign in page
+	fmt.Println("Signing in")
+	signInURL := "https://www.amazon.com/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.com%2F%3Fref_%3Dnav_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=usflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0&"
+	if err := webdriver.Get(signInURL); err != nil {
+		return err
+	}
+
+	//find email text box
+	elemEmail, err := webdriver.FindElement(selenium.ByCSSSelector, "#ap_email")
+	if err != nil {
+		return fmt.Errorf("Could not find email element (%v)", err)
+	}
+
+	//fill email
+	err = elemEmail.SendKeys(username)
+
+	//find continue button
+	elemContinue, err := webdriver.FindElement(selenium.ByCSSSelector, "#continue")
+	if err != nil {
+		return fmt.Errorf("Could not find login continue element (%v)", err)
+	}
+	elemContinue.Click()
+
+	webdriver.Wait(func(wd selenium.WebDriver) (bool, error) {
+		//for {
+		elemPassword, err := webdriver.FindElement(selenium.ByCSSSelector, "#ap_password")
+		if err != nil {
+			return false, fmt.Errorf("Could not find password element (%v)", err)
+		}
+		if elemPassword != nil {
+			return true, nil
+		}
+		return false, nil
+		//}
+	})
+
+	//find password textbox
+	elemPassword, err := webdriver.FindElement(selenium.ByCSSSelector, "#ap_password")
+	if err != nil {
+		return fmt.Errorf("Could not find password element (%v)", err)
+	}
+
+	//fill password textbox
+	err = elemPassword.SendKeys(password)
+
+	//click sign in button
+	elemSignIn, err := webdriver.FindElement(selenium.ByCSSSelector, "#signInSubmit")
+	if err != nil {
+		return fmt.Errorf("Could not find sign in button element (%v)", err)
+	}
+	elemSignIn.Click()
+
+	return nil
 }
 
 func checkStockStatus(body io.ReadCloser) (bool, bool, string) {
