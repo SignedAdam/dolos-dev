@@ -31,13 +31,13 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 	handler.mutex.RLock()
 	//find suitable proxy
 	proxy, err := helperfuncs.FindNextProxy(nil, handler.Proxies, webshopKind, globalProxyLifetime)
-	proxyCopy := *proxy
-	lastProxySet := time.Now()
 	handler.mutex.RUnlock()
 	if err != nil {
 		fmt.Println(fmt.Errorf("Failed to get next proxy for %s [URL: %s] (%v)", productURL.Name, productURL.URL, err))
 		return
 	}
+	proxyCopy := *proxy
+	lastProxySet := time.Now()
 
 	for {
 		select {
