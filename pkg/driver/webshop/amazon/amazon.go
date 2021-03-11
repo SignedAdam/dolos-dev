@@ -5,18 +5,27 @@ import (
 	"dolos-dev/pkg/structs"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
+	"github.com/tebeka/selenium"
 	"golang.org/x/net/html"
 )
 
 //Webshop represents an instance of this webshop driver
 type Webshop struct {
+	Kind structs.Webshop
 }
 
 //New instantiates a new instance of this driver
 func New() *Webshop {
-	return &Webshop{}
+	return &Webshop{
+		Kind: structs.WEBSHOP_AMAZON,
+	}
+}
+
+func (shop *Webshop) GetKind() structs.Webshop {
+	return shop.Kind
 }
 
 //CheckStockStatus checks if a product is in stock on Amazon. Takes a ProductURL struct
@@ -47,8 +56,129 @@ func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy struc
 	return inStock, false, nil, nil
 }
 
-func checkStockStatus(body io.ReadCloser) (bool, bool, string) {
+func (shop *Webshop) Checkout(product structs.ProductURL, webdriver selenium.WebDriver) error {
 
+	fmt.Println("Attempting to checkout product ", product.Name)
+	if err := webdriver.Get(product.URL); err != nil {
+		return err
+	}
+
+	//find buy now button
+	elemBuyNowButton, err := webdriver.FindElement(selenium.ByCSSSelector, "#buy-now-button")
+	if err != nil {
+		return fmt.Errorf("Could not find buy button element (%v)", err)
+	}
+
+	//find price
+	elemPrice, err := webdriver.FindElement(selenium.ByCSSSelector, "#priceblock_ourprice")
+	if err != nil {
+		return fmt.Errorf("Could not find price element (%v)", err)
+	}
+
+	//make sure price is within parameters
+	priceString, err := elemPrice.Text()
+	if err != nil {
+		return fmt.Errorf("Failed get price string from element %s (%v)", priceString, err)
+	}
+
+	priceString = strings.ReplaceAll(priceString, "$", "")
+
+	price, err := strconv.ParseFloat(priceString, 32)
+	if err != nil {
+		return fmt.Errorf("Failed to parce price %s (%v)", priceString, err)
+	}
+
+	if int(price) > product.MaxPrice || int(price) < product.MinPrice {
+		return fmt.Errorf("Price of product %s is outside of parameters (%v)", product.Name, priceString)
+	}
+
+	//click buy now
+	err = elemBuyNowButton.Click()
+	if err != nil {
+		return fmt.Errorf("Failed to click button for product %s (%v)", product.Name, err)
+	}
+
+	//wait ?
+
+	//find continue button
+	elemContinueButton, errContinueBtn := webdriver.FindElement(selenium.ByName, "ppw-widgetEvent:SetPaymentPlanSelectContinueEvent")
+	if errContinueBtn == nil {
+		elemContinueButton.Click()
+	}
+
+	elemPlaceOrder, err := webdriver.FindElement(selenium.ByName, "placeYourOrder1")
+	if err != nil {
+		if errContinueBtn != nil {
+			return fmt.Errorf("Could not find continue OR place order button element (%v)", errContinueBtn)
+		}
+
+		return fmt.Errorf("Could not find place order button element (%v)", err)
+	}
+
+	elemPlaceOrder.Click()
+
+	return nil
+}
+
+//LogInSelenium logs in to Amazon with the given username & password using the given webdriver interface
+func LogInSelenium(username, password string, webdriver selenium.WebDriver) error {
+
+	//navigate to sign in page
+	fmt.Println("Signing in")
+	signInURL := "https://www.amazon.com/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.com%2F%3Fref_%3Dnav_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=usflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0&"
+	if err := webdriver.Get(signInURL); err != nil {
+		return err
+	}
+
+	//find email text box
+	elemEmail, err := webdriver.FindElement(selenium.ByCSSSelector, "#ap_email")
+	if err != nil {
+		return fmt.Errorf("Could not find email element (%v)", err)
+	}
+
+	//fill email
+	err = elemEmail.SendKeys(username)
+
+	//find continue button
+	elemContinue, err := webdriver.FindElement(selenium.ByCSSSelector, "#continue")
+	if err != nil {
+		return fmt.Errorf("Could not find login continue element (%v)", err)
+	}
+	elemContinue.Click()
+
+	webdriver.Wait(func(wd selenium.WebDriver) (bool, error) {
+		//for {
+		elemPassword, err := webdriver.FindElement(selenium.ByCSSSelector, "#ap_password")
+		if err != nil {
+			return false, fmt.Errorf("Could not find password element (%v)", err)
+		}
+		if elemPassword != nil {
+			return true, nil
+		}
+		return false, nil
+		//}
+	})
+
+	//find password textbox
+	elemPassword, err := webdriver.FindElement(selenium.ByCSSSelector, "#ap_password")
+	if err != nil {
+		return fmt.Errorf("Could not find password element (%v)", err)
+	}
+
+	//fill password textbox
+	err = elemPassword.SendKeys(password)
+
+	//click sign in button
+	elemSignIn, err := webdriver.FindElement(selenium.ByCSSSelector, "#signInSubmit")
+	if err != nil {
+		return fmt.Errorf("Could not find sign in button element (%v)", err)
+	}
+	elemSignIn.Click()
+
+	return nil
+}
+
+func checkStockStatus(body io.ReadCloser) (bool, bool, string) {
 	var findElement func(*html.Node) (bool, bool, string)
 	findElement = func(n *html.Node) (bool, bool, string) {
 		if n.Type == html.ElementNode {

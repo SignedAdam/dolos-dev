@@ -1,9 +1,9 @@
 [
     {
         "Name": "rtx 3080 bald edition",
-        "URL": "https://www.amazon.de/-/en/dp/B08VLX84G6",
-        "min_price": 500,
-        "max_price": 1500,
-        "threads": 2
+        "URL": "https://www.amazon.com/dp/B0795DP124/",
+        "min_price": 8,
+        "max_price": 15,
+        "threads": 1
     }
 ]
