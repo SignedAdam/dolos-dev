@@ -1,9 +1,9 @@
 [
     {
-        "Name": "rtx 3080 bald edition",
-        "URL": "https://www.amazon.com/dp/B0795DP124/",
-        "min_price": 8,
-        "max_price": 15,
+        "Name": "Amazon PS5 Digital",
+        "URL": "https://www.amazon.de/-/en/9399506/dp/B08H98GVK8?th=1",
+        "min_price": 350,
+        "max_price": 550,
         "threads": 1
     }
 ]

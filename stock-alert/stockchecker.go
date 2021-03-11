@@ -1,6 +1,7 @@
 package main
 
 import (
+	captchasolver "dolos-dev/pkg/driver/captcha/pysolver"
 	"dolos-dev/pkg/helperfuncs"
 	"dolos-dev/pkg/structs"
 	"dolos-dev/pkg/switcher"
@@ -74,33 +75,44 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 					handler.CaptchaSolver[captchaData.SessionID] = captchaData
 					handler.mutex.Unlock()
 
-					//open chrome to localhost:3077/api/captchasolver/[session_id]
-					helperfuncs.CreateSessionHTML(captchaData.SessionID, captchaData.CaptchaURL)
-					path := fmt.Sprintf("C:/Users/Vegeta/go/src/dolos-dev/%s.html", captchaData.SessionID)
-
-					err = helperfuncs.OpenInBrowser(path) //captchaData.SessionID
+					captchaToken, err := captchasolver.SolveCaptcha(captchaData.CaptchaURL, globalConfig.CaptchaSolverEndpoint)
 					if err != nil {
-						helperfuncs.Log("Failed to open browser (%v)", err)
-						return
+						helperfuncs.Log("Failed to solve captcha (%v)", err)
+
+					} else {
+						helperfuncs.Log("Captcha solved: %s", captchaToken)
 					}
 
-					//wait for captcha to be solved
-					for {
-						handler.mutex.RLock()
-						solved := handler.CaptchaSolver[captchaData.SessionID].Solved
-						handler.mutex.RUnlock()
-						if solved {
-							helperfuncs.Log("Captcha solved. Continuing...")
-							handler.mutex.Lock()
-							delete(handler.CaptchaSolver, captchaData.SessionID)
+					/*
+						//open chrome to localhost:3077/api/captchasolver/[session_id]
+						helperfuncs.CreateSessionHTML(captchaData.SessionID, captchaData.CaptchaURL)
+						path := fmt.Sprintf("captchatemplates/%s.html", captchaData.SessionID)
 
-							handler.mutex.Unlock()
-							break
+						err = helperfuncs.OpenInBrowser(path) //captchaData.SessionID
+						if err != nil {
+							helperfuncs.Log("Failed to open browser (%v)", err)
+							return
 						}
-						time.Sleep(100 * time.Millisecond)
-					}
 
-					_ = captchaData
+						//wait for captcha to be solved
+						helperfuncs.Log("Waiting for captcha solve...")
+						for {
+							handler.mutex.RLock()
+							solved := handler.CaptchaSolver[captchaData.SessionID].Solved
+							handler.mutex.RUnlock()
+							if solved {
+								helperfuncs.Log("Captcha solved. Continuing...")
+								handler.mutex.Lock()
+								delete(handler.CaptchaSolver, captchaData.SessionID)
+
+								handler.mutex.Unlock()
+								break
+							}
+							time.Sleep(100 * time.Millisecond)
+						}
+
+						_ = captchaData
+					*/
 				}
 
 			} else {
