@@ -1,6 +1,7 @@
 package selenium
 
 import (
+	"time"
 	"dolos-dev/pkg/driver/webshop"
 	amazonws "dolos-dev/pkg/driver/webshop/amazon"
 	"dolos-dev/pkg/structs"
@@ -24,7 +25,7 @@ type Session struct {
 }
 
 //New creates a new instance of this driver
-func New(sessionCount int, username, password string) (*SeleniumHandler, error) {
+func New(sessionCount int, sigStopServerChan chan os.Signal, username, password string) (*SeleniumHandler, error) {
 	seleniumHandler := &SeleniumHandler{
 		sessions: make(map[structs.Webshop][]*Session),
 	}
@@ -40,8 +41,33 @@ func New(sessionCount int, username, password string) (*SeleniumHandler, error) 
 		return nil, fmt.Errorf("Failed to start one or more selenium sessions")
 	}
 
+	go seleniumHandler.sessionKeepAlive(sigStopServerChan)
+
 	return seleniumHandler, nil
 }
+
+func (handler *SeleniumHandler) sessionKeepAlive(sigStopServerChan chan os.Signal) {
+	for {
+		select {
+		case <-sigStopServerChan:
+			fmt.Println("sessionKeepAlive goroutine exiting")
+			return
+		default:
+			handler.Lock()
+			for _, webshopSessions:= range handler.sessions {
+				for _, session:= range webshopSessions {
+					session.webdriver.Refresh()
+				}
+			}
+			handler.Unlock()
+
+			time.Sleep(time.Minute * 15)
+		}
+
+	}
+}
+
+
 
 func (handler *SeleniumHandler) Checkout(webshop webshop.Webshop, product structs.ProductURL) error {
 

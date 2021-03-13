@@ -44,7 +44,7 @@ func main() {
 	helperfuncs.Log("Configuration files loaded: \n\t%v product config(s) found \n\t%v proxies found", len(handler.ProductURLs), len(handler.Proxies))
 
 	//TODO username and pass from globalconfig
-	seleniumHandler, err := seleniumdriver.New(1, "bkcourtsecrets@gmail.com", "t3chb0t")
+	seleniumHandler, err := seleniumdriver.New(1, sigStopServerChan, "bkcourtsecrets@gmail.com", "t3chb0t")
 	if err != nil {
 		helperfuncs.Log("Failed to start selenium browser instances (%v)", err)
 	}
