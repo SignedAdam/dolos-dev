@@ -26,6 +26,14 @@ type StockAlertHandler struct {
 	Proxies      []*structs.Proxy
 
 	seleniumHandler *seleniumdriver.SeleniumHandler
+
+	metrics metrics
+}
+
+type metrics struct {
+	inStockSeen int
+	heBorght int
+	captchaSeen int
 }
 
 func main() {
