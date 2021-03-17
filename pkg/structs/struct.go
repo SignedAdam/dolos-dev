@@ -4,6 +4,7 @@ import "time"
 
 //ProductURL represents a single product and the necessary data to check its stock
 type ProductURL struct {
+	ID 		 int `json:"id"`
 	Name     string
 	URL      string
 	MinPrice int `json:"min_price"`
@@ -25,6 +26,8 @@ type GlobalConfig struct {
 	AmazonStockCheckIntervalDeviation int    `json:"amazon_stock_check_interval_deviation"`
 	AmazonUseProxies                  bool   `json:"amazon_use_proxies"`
 	AmazonProxyLifetime               int    `json:"amazon_proxy_lifetime"`
+	AmazonUsername 					  string `json:"amazon_username"`
+	AmazonPassword 					  string `json:"amazon_password"`
 	CaptchaSolverEndpoint             string `json:"captcha_solver_endpoint"`
 }
 

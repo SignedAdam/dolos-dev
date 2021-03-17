@@ -3,5 +3,8 @@
     "amazon_stock_check_interval_deviation": 500,
     "amazon_use_proxies": false,
     "amazon_proxy_lifetime": 999999,
+    "amazon_username": "bkcourtsecrets@gmail.com",
+    "amazon_password": "t3chb0t",
+
     "captcha_solver_endpoint": "http://142.196.182.123:5000/solve"
 }
