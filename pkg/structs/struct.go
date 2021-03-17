@@ -9,6 +9,8 @@ type ProductURL struct {
 	MinPrice int `json:"min_price"`
 	MaxPrice int `json:"max_price"`
 	Threads  int
+	MaxPurchases int `json:"max_purchases"`
+	CurrentPurchases int
 }
 
 type CaptchaWrapper struct {
@@ -40,4 +42,8 @@ type Webshop int
 const (
 	WEBSHOP_NONE   Webshop = 0
 	WEBSHOP_AMAZON Webshop = 1
+	WEBSHOP_AMAZONNL Webshop = 2
+	WEBSHOP_AMAZONDE Webshop = 3
+	WEBSHOP_AMAZONIT Webshop = 4
+	WEBSHOP_AMAZONFR Webshop = 5
 )
