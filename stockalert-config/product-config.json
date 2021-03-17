@@ -1,9 +1,74 @@
 [
     {
-        "Name": "Amazon PS5 Digital",
-        "URL": "https://www.amazon.de/-/en/9399506/dp/B08H98GVK8?th=1",
-        "min_price": 350,
-        "max_price": 550,
-        "threads": 1
+        "id": 1,
+        "Name": "Amazon IT PS5 Digital",
+        "URL": "https://www.amazon.it/Sony-PlayStation-5-Digital-Edition/dp/B08KJF2D25",
+        "min_price": 300,
+        "max_price": 420,
+        "threads": 1,
+        "max_purchases:": 0
+    },
+    {
+        "id": 2,
+        "Name": "Amazon IT PS5 Disc Edition",
+        "URL": "https://www.amazon.it/Playstation-Sony-PlayStation-5/dp/B08KKJ37F7",
+        "min_price": 400,
+        "max_price": 520,
+        "threads": 1,
+        "max_purchases:": 0
+    },
+    {
+        "id": 3,
+        "Name": "Amazon DE PS5 Digital",
+        "URL": "https://www.amazon.de/Sony-Interactive-Entertainment-PlayStation-5/dp/B08H93ZRK9",
+        "min_price": 300,
+        "max_price": 420,
+        "threads": 1,
+        "max_purchases:": 0
+    },
+    {
+        "id": 4,
+        "Name": "Amazon DE PS5 Disc Edition",
+        "URL": "https://www.amazon.de/Sony-PlayStation-5-Digital-Edition/dp/B08H98GVK8",
+        "min_price": 400,
+        "max_price": 520,
+        "threads": 1,
+        "max_purchases:": 0
+    },
+    {
+        "id": 5,
+        "Name": "Amazon NL PS5 Digital",
+        "URL": "https://www.amazon.nl/Sony-PlayStation-PlayStation%C2%AE5-Digital-Edition/dp/B08H98GVK8",
+        "min_price": 300,
+        "max_price": 420,
+        "threads": 1,
+        "max_purchases:": 0
+    },
+    {
+        "id": 6,
+        "Name": "Amazon NL PS5 Disc Edition",
+        "URL": "https://www.amazon.nl/Sony-PlayStation-PlayStation%C2%AE5-Digital-Edition/dp/B08H93ZRK9",
+        "min_price": 400,
+        "max_price": 520,
+        "threads": 1,
+        "max_purchases:": 0
+    },
+    {
+        "id": 7,
+        "Name": "Amazon FR PS5 Digital",
+        "URL": "https://www.amazon.fr/PlayStation-Digital-Manette-DualSense-Couleur/dp/B08H98GVK8",
+        "min_price": 300,
+        "max_price": 420,
+        "threads": 1,
+        "max_purchases:": 0
+    },
+    {
+        "id": 8,
+        "Name": "Amazon FR PS5 Disc Edition",
+        "URL": "https://www.amazon.fr/PlayStation-%C3%89dition-Standard-DualSense-Couleur/dp/B08H93ZRK9",
+        "min_price": 400,
+        "max_price": 520,
+        "threads": 1,
+        "max_purchases:": 0
     }
 ]
