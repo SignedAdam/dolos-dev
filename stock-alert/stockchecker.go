@@ -12,18 +12,24 @@ import (
 	cmdcolor"github.com/TwinProduction/go-color"
 )
 
-func (handler *StockAlertHandler) addMetrics(str string) string {
+func (handler *StockAlertHandler) addMetrics(str string, taskID int) string {
+	taskIDPrefix:= ""
+	if taskID > 0 {
+		taskIDPrefix = fmt.Sprint("#", taskID, "://")
+	}
 	handler.mutex.RLock()
 	str = fmt.Sprint(cmdcolor.Bold, cmdcolor.Gray, "[ B: ", cmdcolor.Blue, handler.metrics.inStockSeen, cmdcolor.Green, " | S: ",  handler.metrics.heBorght, cmdcolor.Yellow,  " | C: ", handler.metrics.captchaSeen, cmdcolor.Gray, " ] ", cmdcolor.Reset,  str)
 	handler.mutex.RUnlock()
 
+	str = fmt.Sprint(taskIDPrefix,str)
+
 	return str
 }
 
-func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal, productURL structs.ProductURL, globalConfig structs.GlobalConfig) {
+func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal, productURL structs.ProductURL, globalConfig structs.GlobalConfig, taskID int) {
 	webshop, webshopKind, err := switcher.GetWebshop(productURL.URL)
 	if err != nil {
-		helperfuncs.Log(handler.addMetrics("Failed to init webshop interface (%v)"), err)
+		helperfuncs.Log(handler.addMetrics("Failed to init webshop interface (%v)", taskID), err)
 	}
 
 	var (
@@ -52,7 +58,7 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 		proxy, err = helperfuncs.FindNextProxy(nil, handler.Proxies, webshopKind, globalProxyLifetime)
 		handler.mutex.RUnlock()
 		if err != nil {
-			helperfuncs.Log(handler.addMetrics("Failed to get next proxy for %s [URL: %s] (%v)"), productURL.Name, productURL.URL, err)
+			helperfuncs.Log(handler.addMetrics("Failed to get next proxy for %s [URL: %s] (%v)", taskID), productURL.Name, productURL.URL, err)
 			return
 		}
 		proxyCopy = *proxy
@@ -63,20 +69,20 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 		select {
 		case <-sigStopServerChan:
 			//if the sigStopChan channel is signalled then we return from the function to kill the thread
-			helperfuncs.Log(handler.addMetrics("Exiting stockChecker thread"))
+			helperfuncs.Log(handler.addMetrics("Exiting stockChecker thread", taskID))
 			return
 		default:
 
 			status, captcha, captchaData, err := webshop.CheckStockStatus(productURL, proxyCopy)
 			if err != nil {
-				helperfuncs.Log(handler.addMetrics("Failed to check stock for %s [URL: %s] (%v)"), productURL.Name, productURL.URL, err)
+				helperfuncs.Log(handler.addMetrics("Failed to check stock for %s [URL: %s] (%v)", taskID), productURL.Name, productURL.URL, err)
 			}
 
 			if captcha {
-				helperfuncs.Log(handler.addMetrics("Captcha found"))
+				helperfuncs.Log(handler.addMetrics("Captcha found", taskID))
 				
 				if captchaData.CaptchaURL == "" {
-					helperfuncs.Log(handler.addMetrics("Captcha does not have a URL"))
+					helperfuncs.Log(handler.addMetrics("Captcha does not have a URL", taskID))
 
 				} else {
 					//put session key and captcha data into CaptchaSolverMap
@@ -87,10 +93,10 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 
 					captchaToken, err := captchasolver.SolveCaptcha(captchaData.CaptchaURL, globalConfig.CaptchaSolverEndpoint)
 					if err != nil {
-						helperfuncs.Log(handler.addMetrics("Failed to solve captcha (%v)"), err)
+						helperfuncs.Log(handler.addMetrics("Failed to solve captcha (%v)", taskID), err)
 
 					} else {
-						helperfuncs.Log(handler.addMetrics("Captcha solved: %s"), captchaToken)
+						helperfuncs.Log(handler.addMetrics("Captcha solved: %s", taskID), captchaToken)
 					}
 
 					/*
@@ -127,7 +133,7 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 
 			} else {
 				if status {
-					helperfuncs.Log(handler.addMetrics(fmt.Sprint("Product ", productURL.Name, " is in stock!!!!!")))
+					helperfuncs.Log(handler.addMetrics(fmt.Sprint("Product ", productURL.Name, " is in stock!!!!!"), taskID))
 					handler.mutex.RLock()
 					err = handler.seleniumHandler.Checkout(webshop, productURL)
 					handler.mutex.RUnlock()
@@ -136,38 +142,53 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 					handler.metrics.inStockSeen++
 					handler.mutex.Unlock()
 					if err != nil {
-						helperfuncs.Log(handler.addMetrics("Failed to buy %s (%v)"), productURL.Name, err)
+						helperfuncs.Log(handler.addMetrics("Failed to buy %s (%v)", taskID), productURL.Name, err)
 					} else {
 						handler.mutex.Lock()
 						handler.metrics.heBorght++
+						
+						if productURL.MaxPurchases > 0 {
+							//find current product in list
+							for _, product:= range handler.ProductURLs {
+								if product.ID == productURL.ID {
+									product.CurrentPurchases ++
+									if product.CurrentPurchases >= product.MaxPurchases {
+										helperfuncs.Log(handler.addMetrics("Completed purchase quota for product %s. Stopping task", taskID), productURL.Name)
+										handler.mutex.Unlock()
+										return
+									}
+									break
+								}
+							}
+						}
 						handler.mutex.Unlock()
 
-						helperfuncs.Log(handler.addMetrics("============"))
-						helperfuncs.Log(handler.addMetrics("HE BORGHT"))
-						helperfuncs.Log(handler.addMetrics("HE BORGHT"))
-						helperfuncs.Log(handler.addMetrics("HE BORGHT"))
-						helperfuncs.Log(handler.addMetrics("HE BORGHT"))
-						helperfuncs.Log(handler.addMetrics("HE BORGHT"))
-						helperfuncs.Log(handler.addMetrics("============"))
+						helperfuncs.Log(handler.addMetrics("============", taskID))
+						helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
+						helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
+						helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
+						helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
+						helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
+						helperfuncs.Log(handler.addMetrics("============", taskID))
 						
 					}
 				} else {
-					helperfuncs.Log(handler.addMetrics(fmt.Sprint("Product ", productURL.Name, " sold out")))
+					helperfuncs.Log(handler.addMetrics(fmt.Sprint("Product ", productURL.Name, " sold out"), taskID))
 				}
 
 				if useProxies {
 					//check if proxy needs to be updated
 					if lastProxySet.Add(time.Duration(globalProxyLifetime)*time.Minute).Before(time.Now()) && proxyLifecycle {
-						helperfuncs.Log(handler.addMetrics("\n==================================================\nchanging proxies from: " + proxyCopy.IP))
+						helperfuncs.Log(handler.addMetrics("\n==================================================\nchanging proxies from: " + proxyCopy.IP, taskID))
 						handler.mutex.Lock()
 						proxy, err = helperfuncs.FindNextProxy(proxy, handler.Proxies, webshopKind, globalProxyLifetime)
 						proxyCopy = *proxy
 						handler.mutex.Unlock()
 						if err != nil {
-							helperfuncs.Log(handler.addMetrics("Failed to get next proxy for %s [URL: %s] (%v)"), productURL.Name, productURL.URL, err)
+							helperfuncs.Log(handler.addMetrics("Failed to get next proxy for %s [URL: %s] (%v)", taskID), productURL.Name, productURL.URL, err)
 							return
 						}
-						helperfuncs.Log(handler.addMetrics(" to " + proxyCopy.IP + "\n==================================================\n"))
+						helperfuncs.Log(handler.addMetrics(" to " + proxyCopy.IP + "\n==================================================\n", taskID))
 
 						lastProxySet = time.Now()
 					}
