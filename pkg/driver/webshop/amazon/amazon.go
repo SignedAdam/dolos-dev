@@ -41,7 +41,7 @@ func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy struc
 		return false, false, nil, err
 	}
 
-	inStock, captcha, captchaURL := checkStockStatus(body)
+	bodyOK, inStock, captcha, captchaURL := checkStockStatus(body)
 
 	if captcha {
 		//generate session id
@@ -53,6 +53,13 @@ func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy struc
 		}
 		return false, true, captchaWrapper, nil
 	}
+
+	//we check if the body contains an expected element, if it does not, then something went wrong while loading the page
+	if !bodyOK {
+		err = fmt.Errorf("Body failed to properly load for some reason...")
+		return false, false, nil, err
+	}
+	
 	return inStock, false, nil, nil
 }
 
@@ -121,11 +128,12 @@ func (shop *Webshop) Checkout(product structs.ProductURL, webdriver selenium.Web
 }
 
 //LogInSelenium logs in to Amazon with the given username & password using the given webdriver interface
-func LogInSelenium(username, password string, webdriver selenium.WebDriver) error {
+func LogInSelenium(username, password string, webdriver selenium.WebDriver, signInURL string) error {
 
 	//navigate to sign in page
 	fmt.Println("Signing in")
-	signInURL := "https://www.amazon.com/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.com%2F%3Fref_%3Dnav_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=usflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0&"
+	            //https://www.amazon.nl /ap/signin?openid.pape.max_auth_age=0                                                                     &openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=nlflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0&
+	//signInURL := "https://www.amazon.com/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.com%2F%3Fref_%3Dnav_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=usflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0&"
 	if err := webdriver.Get(signInURL); err != nil {
 		return err
 	}
@@ -178,10 +186,19 @@ func LogInSelenium(username, password string, webdriver selenium.WebDriver) erro
 	return nil
 }
 
-func checkStockStatus(body io.ReadCloser) (bool, bool, string) {
-	var findElement func(*html.Node) (bool, bool, string)
-	findElement = func(n *html.Node) (bool, bool, string) {
+func checkStockStatus(body io.ReadCloser) (bool, bool, bool, string) {
+	var findElement func(bool, *html.Node) (bool, bool, bool, string)
+	findElement = func(bodyAlreadyFound bool, n *html.Node) (bool, bool, bool, string) {
+		bodyOK:= bodyAlreadyFound
 		if n.Type == html.ElementNode {
+			if n.Data == "h1" {
+				for _, a := range n.Attr {
+					if a.Key == "productTitle" {
+						bodyOK = true
+					}
+				}
+			}
+
 			if n.Data == "input" {
 				for _, a := range n.Attr {
 					if a.Key == "id" {
@@ -193,7 +210,7 @@ func checkStockStatus(body io.ReadCloser) (bool, bool, string) {
 						}
 
 						if a.Val == "buy-now-button" {
-							return true, false, ""
+							return bodyOK, true, false, ""
 						}
 					}
 				}
@@ -203,7 +220,7 @@ func checkStockStatus(body io.ReadCloser) (bool, bool, string) {
 					if a.Key == "src" {
 						if strings.Contains(a.Val, "captcha") {
 							fmt.Println("Captcha img found")
-							return false, true, a.Val
+							return bodyOK, false, true, a.Val
 
 						}
 					}
@@ -212,23 +229,23 @@ func checkStockStatus(body io.ReadCloser) (bool, bool, string) {
 		}
 
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			inStock, captcha, captchaURL := findElement(c)
+			bodyOK, inStock, captcha, captchaURL := findElement(bodyOK, c)
 			if inStock || captcha {
-				return inStock, captcha, captchaURL
+				return bodyOK, inStock, captcha, captchaURL
 			}
 
 		}
-		return false, false, ""
+		return bodyOK, false, false, ""
 	}
 
 	doc, err := html.Parse(body)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("Failed to parse body into a html document (%v)", err))
-		return false, false, ""
+		return false, false, false, ""
 
 	}
 
-	return findElement(doc)
+	return findElement(false, doc)
 
 }
 
