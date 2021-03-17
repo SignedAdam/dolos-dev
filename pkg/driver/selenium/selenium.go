@@ -1,6 +1,7 @@
 package selenium
 
 import (
+	"dolos-dev/pkg/helperfuncs"
 	"time"
 	"dolos-dev/pkg/driver/webshop"
 	amazonws "dolos-dev/pkg/driver/webshop/amazon"
@@ -20,19 +21,49 @@ type SeleniumHandler struct {
 
 //Session represents a single selenium webdriver and has a flag 'busy' to indicate whether or not it is being used by another task
 type Session struct {
+	id int
 	webdriver selenium.WebDriver
 	busy      bool
 }
 
+
+func (handler *SeleniumHandler) maxSessionsCreated(maxSessionCount int, url string, globalConfig structs.GlobalConfig) (bool, structs.Webshop, string, string) {
+	webshopKind:= helperfuncs.GetWebshopFromString(url)
+
+	var username, password string
+	switch webshopKind {
+	case structs.WEBSHOP_AMAZON, structs.WEBSHOP_AMAZONNL, structs.WEBSHOP_AMAZONFR, structs.WEBSHOP_AMAZONIT, structs.WEBSHOP_AMAZONDE:
+		username = globalConfig.AmazonUsername
+		password = globalConfig.AmazonPassword
+	}
+
+	handler.RLock()
+	count:= len(handler.sessions[webshopKind])
+	handler.RUnlock()
+	if count < maxSessionCount {
+		return false, webshopKind, username, password
+	}
+	
+	return true, 0, "", ""
+}
+
+
+
+
 //New creates a new instance of this driver
-func New(sessionCount int, sigStopServerChan chan os.Signal, username, password string) (*SeleniumHandler, error) {
+func New(sessionCount int, sigStopServerChan chan os.Signal, globalConfig structs.GlobalConfig, productURLs []*structs.ProductURL) (*SeleniumHandler, error) {
 	seleniumHandler := &SeleniumHandler{
 		sessions: make(map[structs.Webshop][]*Session),
 	}
 	var wg sync.WaitGroup
 	for i := 0; i < sessionCount; i++ {
-		wg.Add(1)
-		go seleniumHandler.createSession(&wg, i, structs.WEBSHOP_AMAZON, username, password)
+		for _, productURL:= range productURLs {
+			maxReached, webshopKind, user, pass:= seleniumHandler.maxSessionsCreated(sessionCount, productURL.URL, globalConfig)
+			if !maxReached {
+				wg.Add(1)
+				go seleniumHandler.createSession(&wg, i, webshopKind, user, pass)			
+			}
+		}
 	}
 	wg.Wait()
 
@@ -90,8 +121,22 @@ func (handler *SeleniumHandler) Checkout(webshop webshop.Webshop, product struct
 }
 
 func (handler *SeleniumHandler) createSession(wg *sync.WaitGroup, id int, webshopKind structs.Webshop, username, password string) {
+	//we add the session to the handler immediately, so any parent functions will already know it's being worked on
+	newSession := &Session{
+		id: id,
+	}
+	handler.addSessionSafe(webshopKind, newSession)
+
 	defer wg.Done()
 
+	webdriver, err:= handler.initAndLoginSession(id, webshopKind, username, password)
+	if err != nil {
+		fmt.Println(fmt.Sprintf("Failed to create selenium session (%v)", err))
+		//delete 
+		handler.deleteBadSession(id, webshopKind)
+		return
+	}
+	/*
 	var (
 		// These paths will be different on your system.
 		seleniumPath     = "selenium/selenium-server/selenium-server-standalone-3.141.59.jar" //client-combined-3.141.59
@@ -106,6 +151,9 @@ func (handler *SeleniumHandler) createSession(wg *sync.WaitGroup, id int, websho
 	_, err := selenium.NewSeleniumService(seleniumPath, port, opts...)
 	if err != nil {
 		fmt.Println(err)
+		handler.Lock()
+		newSession.busy = true
+		handler.Unlock()
 		return
 	}
 	//defer service.Stop()
@@ -115,20 +163,102 @@ func (handler *SeleniumHandler) createSession(wg *sync.WaitGroup, id int, websho
 	wd, err := selenium.NewRemote(caps, fmt.Sprintf("http://localhost:%d/wd/hub", port))
 	if err != nil {
 		fmt.Println(err)
+		handler.Lock()
+		newSession.busy = true
+		handler.Unlock()
 		return
 	}
 
-	switch webshopKind {
-	case structs.WEBSHOP_AMAZON:
-		amazonws.LogInSelenium(username, password, wd)
+	signInURL, signInFunc:= getSignInURLAndFunc(webshopKind)
+	err = signInFunc(username, password, wd, signInURL)
+	if err != nil {
+		fmt.Println("Failed to log in for this session")
+		handler.Lock()
+		newSession.busy = true
+		handler.Unlock()
+		return
 	}
-	newSession := &Session{
-		webdriver: wd,
-	}
-	handler.addSession(webshopKind, newSession)
+	*/
+	handler.Lock()
+	newSession.webdriver= webdriver
+	handler.Unlock()
 }
 
-func (handler *SeleniumHandler) addSession(webshopKind structs.Webshop, session *Session) {
+func (handler *SeleniumHandler) initAndLoginSession(id int, webshopKind structs.Webshop, username, password string) (selenium.WebDriver, error) {
+	var (
+		// These paths will be different on your system.
+		seleniumPath     = "selenium/selenium-server/selenium-server-standalone-3.141.59.jar" //client-combined-3.141.59
+		chromeDriverPath = "selenium/chrome-driver/chromedriver.exe"
+		port             = 8099 + id
+	)
+	opts := []selenium.ServiceOption{
+		//selenium.StartFrameBuffer(),
+		selenium.ChromeDriver(chromeDriverPath),
+		selenium.Output(os.Stderr),
+	}
+	_, err := selenium.NewSeleniumService(seleniumPath, port, opts...)
+	if err != nil {
+		return nil, err
+	}
+	//defer service.Stop()
+
+	// Connect to the WebDriver instance running locally.
+	caps := selenium.Capabilities{"browserName": "chrome"}
+	wd, err := selenium.NewRemote(caps, fmt.Sprintf("http://localhost:%d/wd/hub", port))
+	if err != nil {
+		return nil, err
+	}
+
+	signInURL, signInFunc:= getSignInURLAndFunc(webshopKind)
+	err = signInFunc(username, password, wd, signInURL)
+	if err != nil {
+		err = fmt.Errorf("Failed to log in for this session (%v)", err)
+		return nil, err
+	}
+
+	return wd, nil
+}
+
+//delete session that failed to init or whatever
+func (handler *SeleniumHandler) deleteBadSession(id int, webshopKind structs.Webshop){
+	handler.Lock()
+	for i, session:= range handler.sessions[webshopKind] {
+		if session.id == id {
+			handler.sessions[webshopKind] = remove(handler.sessions[webshopKind], i)
+		}
+	}
+	handler.Unlock()
+}
+
+//removes a session from a session slice and returns the result
+func remove(s []*Session, i int) []*Session {
+    s[len(s)-1], s[i] = s[i], s[len(s)-1]
+    return s[:len(s)-1]
+}
+
+func getSignInURLAndFunc(webshopKind structs.Webshop) (string, func(string, string, selenium.WebDriver, string) error){
+	switch webshopKind {
+	case structs.WEBSHOP_AMAZON:
+		signInURL := "https://www.amazon.com/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.com%2F%3Fref_%3Dnav_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=usflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0&"
+		return signInURL, amazonws.LogInSelenium
+	case structs.WEBSHOP_AMAZONNL:
+		signInURL := "https://www.amazon.nl/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.nl%2Fref%3Dnav_ya_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=nlflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0&"
+		return signInURL, amazonws.LogInSelenium
+	case structs.WEBSHOP_AMAZONDE:
+		signInURL := "https://www.amazon.de/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.de%2Fref%3Dnav_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=deflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0&"
+		return signInURL, amazonws.LogInSelenium
+	case structs.WEBSHOP_AMAZONFR:
+		signInURL := "https://www.amazon.fr/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.fr%2F%3Fref_%3Dnav_custrec_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=frflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0&"
+		return signInURL, amazonws.LogInSelenium
+	case structs.WEBSHOP_AMAZONIT:
+		signInURL := "https://www.amazon.it/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.it%2F%3Fref_%3Dnav_custrec_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=itflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0&"
+		return signInURL, amazonws.LogInSelenium
+	}
+
+	return "", nil
+}
+
+func (handler *SeleniumHandler) addSessionSafe(webshopKind structs.Webshop, session *Session) {
 	handler.Lock()
 	handler.sessions[webshopKind] = append(handler.sessions[webshopKind], session)
 	handler.Unlock()
