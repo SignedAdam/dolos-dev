@@ -1,6 +1,7 @@
 package amazon
 
 import (
+	"io/ioutil"
 	"dolos-dev/pkg/helperfuncs"
 	"dolos-dev/pkg/structs"
 	"fmt"
@@ -58,6 +59,15 @@ func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy struc
 	//we check if the body contains an expected element, if it does not, then something went wrong while loading the page
 	if !bodyOK && !inStock && !inStockCartButton{
 		err = fmt.Errorf("Body failed to properly load for some reason...")
+
+		bytes, err:= ioutil.ReadAll(body)
+		if err != nil {
+			fmt.Printf(err.Error() + ":" + "failed to read body (%v)", err)
+			return false, false, false, nil, err
+		}
+
+		err = helperfuncs.SaveBodyToHTML(bytes)
+
 		return false, false, false, nil, err
 	}
 

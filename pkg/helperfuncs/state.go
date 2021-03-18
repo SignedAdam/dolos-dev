@@ -8,6 +8,18 @@ import (
 	"os"
 )
 
+func SaveBodyToHTML(bodyBytes []byte) error {
+	readStr := string(bodyBytes)
+
+	rndStr:= GenerateRandomString(10)
+	err:= ioutil.WriteFile(fmt.Sprintf("debug/%s.html", rndStr), []byte(readStr), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write body to HTML file (%v)", err)
+	}
+
+	return nil
+}
+
 //SaveState saves the Product URLs config to a json file
 func SaveState(products []*structs.ProductURL) error {
 	//check if directory exists already
