@@ -1,13 +1,13 @@
 package main
 
 import (
+	"context"
 	captchasolver "dolos-dev/pkg/driver/captcha/pysolver"
 	"dolos-dev/pkg/helperfuncs"
 	"dolos-dev/pkg/structs"
 	"dolos-dev/pkg/switcher"
 	"fmt"
 	"math/rand"
-	"os"
 	"time"
 	cmdcolor"github.com/TwinProduction/go-color"
 )
@@ -15,10 +15,10 @@ import (
 func (handler *StockAlertHandler) addMetrics(str string, taskID int) string {
 	taskIDPrefix:= ""
 	if taskID > 0 {
-		taskIDPrefix = fmt.Sprint("#", taskID, "://")
+		taskIDPrefix = fmt.Sprint(cmdcolor.Bold, cmdcolor.Red, "#", taskID, "://")
 	}
 	handler.mutex.RLock()
-	str = fmt.Sprint(cmdcolor.Bold, cmdcolor.Gray, "[ B: ", cmdcolor.Blue, handler.metrics.inStockSeen, cmdcolor.Green, " | S: ",  handler.metrics.heBorght, cmdcolor.Yellow,  " | C: ", handler.metrics.captchaSeen, cmdcolor.Gray, " ] ", cmdcolor.Reset,  str)
+	str = fmt.Sprint(cmdcolor.Bold, cmdcolor.Gray, " [", cmdcolor.Blue, " B: ", handler.metrics.inStockSeen, cmdcolor.Green, " | S: ",  handler.metrics.heBorght, cmdcolor.Yellow,  " | C: ", handler.metrics.captchaSeen, cmdcolor.Gray, " ] ", cmdcolor.Reset,  str)
 	handler.mutex.RUnlock()
 
 	str = fmt.Sprint(taskIDPrefix,str)
@@ -26,7 +26,7 @@ func (handler *StockAlertHandler) addMetrics(str string, taskID int) string {
 	return str
 }
 
-func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal, productURL structs.ProductURL, globalConfig structs.GlobalConfig, taskID int) {
+func (handler *StockAlertHandler) stockChecker(ctx context.Context, productURL structs.ProductURL, globalConfig structs.GlobalConfig, taskID int) {
 	webshop, webshopKind, err := switcher.GetWebshop(productURL.URL)
 	if err != nil {
 		helperfuncs.Log(handler.addMetrics("Failed to init webshop interface (%v)", taskID), err)
@@ -67,13 +67,13 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 
 	for {
 		select {
-		case <-sigStopServerChan:
+		case <-ctx.Done():
 			//if the sigStopChan channel is signalled then we return from the function to kill the thread
 			helperfuncs.Log(handler.addMetrics("Exiting stockChecker thread", taskID))
 			return
 		default:
 
-			status, captcha, captchaData, err := webshop.CheckStockStatus(productURL, proxyCopy)
+			status, useAddToCartButton, captcha, captchaData, err := webshop.CheckStockStatus(productURL, proxyCopy)
 			if err != nil {
 				helperfuncs.Log(handler.addMetrics("Failed to check stock for %s [URL: %s] (%v)", taskID), productURL.Name, productURL.URL, err)
 			}
@@ -134,44 +134,48 @@ func (handler *StockAlertHandler) stockChecker(sigStopServerChan chan os.Signal,
 			} else {
 				if status {
 					helperfuncs.Log(handler.addMetrics(fmt.Sprint("Product ", productURL.Name, " is in stock!!!!!"), taskID))
-					handler.mutex.RLock()
-					err = handler.seleniumHandler.Checkout(webshop, productURL)
-					handler.mutex.RUnlock()
-
+					
+					if !productURL.OnlyCheckStock {
+						handler.mutex.RLock()
+						err = handler.seleniumHandler.Checkout(useAddToCartButton, webshop, productURL)
+						handler.mutex.RUnlock()
+	
+	
+						if err != nil {
+							helperfuncs.Log(handler.addMetrics("Failed to buy %s (%v)", taskID), productURL.Name, err)
+						} else {
+							handler.mutex.Lock()
+							handler.metrics.heBorght++
+							
+							if productURL.MaxPurchases > 0 {
+								//find current product in list
+								for _, product:= range handler.ProductURLs {
+									if product.ID == productURL.ID {
+										product.CurrentPurchases ++
+										if product.CurrentPurchases >= product.MaxPurchases {
+											helperfuncs.Log(handler.addMetrics("Completed purchase quota for product %s. Stopping task", taskID), productURL.Name)
+											handler.mutex.Unlock()
+											return
+										}
+										break
+									}
+								}
+							}
+							handler.mutex.Unlock()
+	
+							helperfuncs.Log(handler.addMetrics("============", taskID))
+							helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
+							helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
+							helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
+							helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
+							helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
+							helperfuncs.Log(handler.addMetrics("============", taskID))
+						}
+					}
+					
 					handler.mutex.Lock()
 					handler.metrics.inStockSeen++
 					handler.mutex.Unlock()
-					if err != nil {
-						helperfuncs.Log(handler.addMetrics("Failed to buy %s (%v)", taskID), productURL.Name, err)
-					} else {
-						handler.mutex.Lock()
-						handler.metrics.heBorght++
-						
-						if productURL.MaxPurchases > 0 {
-							//find current product in list
-							for _, product:= range handler.ProductURLs {
-								if product.ID == productURL.ID {
-									product.CurrentPurchases ++
-									if product.CurrentPurchases >= product.MaxPurchases {
-										helperfuncs.Log(handler.addMetrics("Completed purchase quota for product %s. Stopping task", taskID), productURL.Name)
-										handler.mutex.Unlock()
-										return
-									}
-									break
-								}
-							}
-						}
-						handler.mutex.Unlock()
-
-						helperfuncs.Log(handler.addMetrics("============", taskID))
-						helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
-						helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
-						helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
-						helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
-						helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
-						helperfuncs.Log(handler.addMetrics("============", taskID))
-						
-					}
 				} else {
 					helperfuncs.Log(handler.addMetrics(fmt.Sprint("Product ", productURL.Name, " sold out"), taskID))
 				}
