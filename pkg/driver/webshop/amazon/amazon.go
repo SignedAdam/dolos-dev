@@ -43,7 +43,17 @@ func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy struc
 		return false, false, false, nil, err
 	}
 
-	bodyCopy:= body
+	bytes, err2:= ioutil.ReadAll(body)
+	if err2 != nil {
+		err = fmt.Errorf(err.Error() + ":" + "failed to read body (%v)", err2)
+		return false, false, false, nil, err
+	}
+
+	err2 = helperfuncs.SaveBodyToHTML(bytes)
+	if err2 != nil {
+		err = fmt.Errorf("%v (%v)", err, err2)
+		return false, false, false, nil, err
+	}
 
 	bodyOK, inStock, inStockCartButton, captcha, captchaURL := checkStockStatus(body)
 
