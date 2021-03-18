@@ -60,13 +60,17 @@ func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy struc
 	if !bodyOK && !inStock && !inStockCartButton{
 		err = fmt.Errorf("Body failed to properly load for some reason...")
 
-		bytes, err:= ioutil.ReadAll(body)
-		if err != nil {
-			fmt.Printf(err.Error() + ":" + "failed to read body (%v)", err)
+		bytes, err2:= ioutil.ReadAll(body)
+		if err2 != nil {
+			err = fmt.Errorf(err.Error() + ":" + "failed to read body (%v)", err2)
 			return false, false, false, nil, err
 		}
 
-		err = helperfuncs.SaveBodyToHTML(bytes)
+		err2 = helperfuncs.SaveBodyToHTML(bytes)
+		if err2 != nil {
+			err = fmt.Errorf("%v (%v)", err, err2)
+			return false, false, false, nil, err
+		}
 
 		return false, false, false, nil, err
 	}

@@ -10,7 +10,7 @@ import (
 
 func SaveBodyToHTML(bodyBytes []byte) error {
 	readStr := string(bodyBytes)
-
+	fmt.Println("writing to file:", readStr)
 	rndStr:= GenerateRandomString(10)
 	err:= ioutil.WriteFile(fmt.Sprintf("debug/%s.html", rndStr), []byte(readStr), 0644)
 	if err != nil {
