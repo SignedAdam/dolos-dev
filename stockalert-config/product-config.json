@@ -6,7 +6,8 @@
         "min_price": 300,
         "max_price": 420,
         "threads": 1,
-        "max_purchases:": 0
+        "max_purchases:": 0,
+        "only_check_stock": false
     },
     {
         "id": 2,

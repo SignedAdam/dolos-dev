@@ -12,6 +12,7 @@ type ProductURL struct {
 	Threads  int
 	MaxPurchases int `json:"max_purchases"`
 	CurrentPurchases int
+	OnlyCheckStock bool `json:"only_check_stock"`
 }
 
 type CaptchaWrapper struct {
