@@ -10,6 +10,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"context"
 
 	seleniumdriver "dolos-dev/pkg/driver/selenium"
 	"dolos-dev/pkg/helperfuncs"
@@ -38,7 +39,14 @@ type metrics struct {
 
 func main() {
 	sigStopServerChan := make(chan os.Signal, 1)
-	signal.Notify(sigStopServerChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigStopServerChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGQUIT)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		<-sigStopServerChan
+		log.Println("sig int received - stopping everything")
+		cancel()
+	}()
 
 	handler := StockAlertHandler{
 		CaptchaSolver: make(map[string]*structs.CaptchaWrapper),
@@ -52,21 +60,24 @@ func main() {
 	helperfuncs.Log("Configuration files loaded: \n\t%v product config(s) found \n\t%v proxies found", len(handler.ProductURLs), len(handler.Proxies))
 
 	//TODO username and pass from globalconfig
-	seleniumHandler, err := seleniumdriver.New(1, sigStopServerChan, *handler.GlobalConfig, handler.ProductURLs)
+	seleniumHandler, err := seleniumdriver.New(1, ctx, *handler.GlobalConfig, handler.ProductURLs)
 	if err != nil {
 		helperfuncs.Log("Failed to start selenium browser instances (%v)", err)
 	}
 	handler.seleniumHandler = seleniumHandler
 
+	ij:= 0
 	for _, product := range handler.ProductURLs {
 		for i := 0; i < product.Threads; i++ {
+			ij++
 			time.Sleep(500 * time.Millisecond)
-			handler.mutex.Lock()
-			go handler.stockChecker(sigStopServerChan, *product, *handler.GlobalConfig, i+1)
-			handler.mutex.Unlock()
+			//handler.mutex.Lock()
+			handler.stockChecker(ctx, *product, *handler.GlobalConfig, ij)
+			//handler.mutex.Unlock()
 		}
 	}
 
+	go handler.exitHandler(ctx)
 	//Initialize our REST API router & endpoints
 	mux := http.NewServeMux()
 
@@ -76,9 +87,19 @@ func main() {
 	mux.HandleFunc("/api/test", corsHandler(handler.Test))
 
 	//serve the API on port 3077
-	http.ListenAndServe(":3077", mux)
+	go http.ListenAndServe(":3077", mux)
+
+	<- ctx.Done()
 
 	log.Println("server stopped")
+}
+
+func (handler *StockAlertHandler) exitHandler(ctx context.Context) {
+	<-ctx.Done()
+	handler.mutex.Lock()
+	handler.seleniumHandler.CloseAll()
+	handler.mutex.Unlock()	
+	fmt.Println("Closed all selenium related processes")
 }
 
 //CaptchaSolverHandler handles http requests for solving captcha
