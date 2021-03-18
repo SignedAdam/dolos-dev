@@ -18,9 +18,9 @@ type Webshop struct {
 }
 
 //New instantiates a new instance of this driver
-func New() *Webshop {
+func New(webshopKind structs.Webshop) *Webshop {
 	return &Webshop{
-		Kind: structs.WEBSHOP_AMAZON,
+		Kind: webshopKind ,
 	}
 }
 
@@ -31,17 +31,18 @@ func (shop *Webshop) GetKind() structs.Webshop {
 //CheckStockStatus checks if a product is in stock on Amazon. Takes a ProductURL struct
 //returns:
 //bool inStock - boolean representing whether or not the item is in stock
+//bool inStockCartButton - boolean representing whether or not the item is in stock, but only with a add to cart button
 //bool captcha - boolan representing whether or not a captcha is returned on the page and needs to be solved to proceed
 //struct CaptchaWrapper - struct containing all the necessary information about a captcha if one is present
 //error - in case something goes wrong in the request
-func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy structs.Proxy) (bool, bool, *structs.CaptchaWrapper, error) {
+func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy structs.Proxy) (bool, bool, bool, *structs.CaptchaWrapper, error) {
 	body, err := helperfuncs.GetBodyHTML(productURL.URL, proxy.IP, proxy.Port, proxy.User, proxy.Password)
 	if err != nil {
 		fmt.Println(fmt.Errorf("Failed to get body (%v)", err))
-		return false, false, nil, err
+		return false, false, false, nil, err
 	}
 
-	bodyOK, inStock, captcha, captchaURL := checkStockStatus(body)
+	bodyOK, inStock, inStockCartButton, captcha, captchaURL := checkStockStatus(body)
 
 	if captcha {
 		//generate session id
@@ -51,29 +52,42 @@ func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy struc
 			CaptchaURL: captchaURL,
 			SessionID:  sessionID,
 		}
-		return false, true, captchaWrapper, nil
+		return false, false, true, captchaWrapper, nil
 	}
 
 	//we check if the body contains an expected element, if it does not, then something went wrong while loading the page
-	if !bodyOK {
+	if !bodyOK && !inStock && !inStockCartButton{
 		err = fmt.Errorf("Body failed to properly load for some reason...")
-		return false, false, nil, err
+		return false, false, false, nil, err
 	}
-	
-	return inStock, false, nil, nil
+
+	return inStock, inStockCartButton, false, nil, nil
 }
 
-func (shop *Webshop) Checkout(product structs.ProductURL, webdriver selenium.WebDriver) error {
+func getCountryCode(url string) string {
+	if strings.Contains(url, "amazon.com"){
+		return ".com"
+	}
+	if strings.Contains(url, "amazon.fr"){
+		return ".fr"
+	}
+	if strings.Contains(url, "amazon.de"){
+		return ".de"
+	}
+	if strings.Contains(url, "amazon.nl"){
+		return ".nl"
+	}
+	if strings.Contains(url, "amazon.it"){
+		return ".it"
+	}
+	return "ERROR"
+}
+
+func (shop *Webshop) Checkout(useAddToCartButton bool, product structs.ProductURL, webdriver selenium.WebDriver) error {
 
 	fmt.Println("Attempting to checkout product ", product.Name)
 	if err := webdriver.Get(product.URL); err != nil {
 		return err
-	}
-
-	//find buy now button
-	elemBuyNowButton, err := webdriver.FindElement(selenium.ByCSSSelector, "#buy-now-button")
-	if err != nil {
-		return fmt.Errorf("Could not find buy button element (%v)", err)
 	}
 
 	//find price
@@ -89,7 +103,9 @@ func (shop *Webshop) Checkout(product structs.ProductURL, webdriver selenium.Web
 	}
 
 	priceString = strings.ReplaceAll(priceString, "$", "")
+	priceString = strings.ReplaceAll(priceString, "€", "")
 
+	
 	price, err := strconv.ParseFloat(priceString, 32)
 	if err != nil {
 		return fmt.Errorf("Failed to parce price %s (%v)", priceString, err)
@@ -99,19 +115,43 @@ func (shop *Webshop) Checkout(product structs.ProductURL, webdriver selenium.Web
 		return fmt.Errorf("Price of product %s is outside of parameters (%v)", product.Name, priceString)
 	}
 
-	//click buy now
-	err = elemBuyNowButton.Click()
-	if err != nil {
-		return fmt.Errorf("Failed to click button for product %s (%v)", product.Name, err)
-	}
+	var errContinueBtn error = nil
+	if useAddToCartButton {
+		//find add to cart button
+		elemAddToCartButton, err := webdriver.FindElement(selenium.ByCSSSelector, "#add-to-cart-button")
+		if err != nil {
+			return fmt.Errorf("Could not find add to cart button element (%v)", err)
+		}
 
+		//click add to cart
+		err = elemAddToCartButton.Click()
+		if err != nil {
+			return fmt.Errorf("Failed to click add to cart  button for product %s (%v)", product.Name, err)
+		}
+
+		//url to go directly to checkout
+		webdriver.Get(fmt.Sprint("https://www.amazon", getCountryCode(product.URL), "/-/en/gp/cart/view.html/ref=lh_co?ie=UTF8&proceedToCheckout.x=129&cartInitiateId=1616029244603&hasWorkingJavascript=1"))
+	}else{
+		//find buy now button
+		elemBuyNowButton, err := webdriver.FindElement(selenium.ByCSSSelector, "#buy-now-button")
+		if err != nil {
+			return fmt.Errorf("Could not find buy button element (%v)", err)
+		}
+
+		//click buy now
+		err = elemBuyNowButton.Click()
+		if err != nil {
+			return fmt.Errorf("Failed to click buy button for product %s (%v)", product.Name, err)
+		}
+
+		//find continue button
+		elemContinueButton, err := webdriver.FindElement(selenium.ByName, "ppw-widgetEvent:SetPaymentPlanSelectContinueEvent")
+		errContinueBtn = err
+		if errContinueBtn == nil {
+			elemContinueButton.Click()
+		}
+	}
 	//wait ?
-
-	//find continue button
-	elemContinueButton, errContinueBtn := webdriver.FindElement(selenium.ByName, "ppw-widgetEvent:SetPaymentPlanSelectContinueEvent")
-	if errContinueBtn == nil {
-		elemContinueButton.Click()
-	}
 
 	elemPlaceOrder, err := webdriver.FindElement(selenium.ByName, "placeYourOrder1")
 	if err != nil {
@@ -183,18 +223,36 @@ func LogInSelenium(username, password string, webdriver selenium.WebDriver, sign
 	}
 	elemSignIn.Click()
 
+
+
+	//WAIT FOR  to appear
+
+	webdriver.Wait(func(wd selenium.WebDriver) (bool, error) {
+		//for {
+		elemPassword, err := webdriver.FindElement(selenium.ByClassName, "#nav-search-field")
+		if err != nil {
+			return false, fmt.Errorf("Could not find password element (%v)", err)
+		}
+		if elemPassword != nil {
+			return true, nil
+		}
+		return false, nil
+		//}
+	})
 	return nil
 }
 
-func checkStockStatus(body io.ReadCloser) (bool, bool, bool, string) {
-	var findElement func(bool, *html.Node) (bool, bool, bool, string)
-	findElement = func(bodyAlreadyFound bool, n *html.Node) (bool, bool, bool, string) {
+func checkStockStatus(body io.ReadCloser) (bool, bool, bool, bool, string) {
+	var findElement func(bool, *html.Node) (bool, bool, bool, bool, string)
+	findElement = func(bodyAlreadyFound bool, n *html.Node) (bool, bool, bool, bool, string) {
 		bodyOK:= bodyAlreadyFound
 		if n.Type == html.ElementNode {
-			if n.Data == "h1" {
+			if n.Data == "span" && !bodyOK {
 				for _, a := range n.Attr {
-					if a.Key == "productTitle" {
-						bodyOK = true
+					if a.Key == "id" {
+						if a.Val == "productTitle" {
+							bodyOK = true
+						}
 					}
 				}
 			}
@@ -210,8 +268,14 @@ func checkStockStatus(body io.ReadCloser) (bool, bool, bool, string) {
 						}
 
 						if a.Val == "buy-now-button" {
-							return bodyOK, true, false, ""
+							return bodyOK, true, false, false, ""
 						}
+						
+						if a.Val == "add-to-cart-button" {
+							return bodyOK, true, true, false, ""
+						}
+
+						
 					}
 				}
 			}
@@ -220,7 +284,7 @@ func checkStockStatus(body io.ReadCloser) (bool, bool, bool, string) {
 					if a.Key == "src" {
 						if strings.Contains(a.Val, "captcha") {
 							fmt.Println("Captcha img found")
-							return bodyOK, false, true, a.Val
+							return bodyOK, false, false, true, a.Val
 
 						}
 					}
@@ -229,19 +293,20 @@ func checkStockStatus(body io.ReadCloser) (bool, bool, bool, string) {
 		}
 
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			bodyOK, inStock, captcha, captchaURL := findElement(bodyOK, c)
-			if inStock || captcha {
-				return bodyOK, inStock, captcha, captchaURL
+			newBodyOK, inStock, inStockCartButton, captcha, captchaURL := findElement(bodyOK, c)
+			bodyOK = newBodyOK
+			if inStock || inStockCartButton || captcha  {
+				return bodyOK, inStock, inStockCartButton, captcha, captchaURL
 			}
 
 		}
-		return bodyOK, false, false, ""
+		return bodyOK, false, false, false, ""
 	}
 
 	doc, err := html.Parse(body)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("Failed to parse body into a html document (%v)", err))
-		return false, false, false, ""
+		return false, false, false, false, ""
 
 	}
 

@@ -7,8 +7,8 @@ import (
 	amazonws "dolos-dev/pkg/driver/webshop/amazon"
 	"dolos-dev/pkg/structs"
 	"fmt"
-	"os"
 	"sync"
+	"context"
 
 	"github.com/tebeka/selenium"
 )
@@ -23,7 +23,36 @@ type SeleniumHandler struct {
 type Session struct {
 	id int
 	webdriver selenium.WebDriver
+	seleniumService *selenium.Service
 	busy      bool
+}
+
+//New creates a new instance of this driver
+func New(sessionCount int, ctx context.Context, globalConfig structs.GlobalConfig, productURLs []*structs.ProductURL) (*SeleniumHandler, error) {
+	seleniumHandler := &SeleniumHandler{
+		sessions: make(map[structs.Webshop][]*Session),
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < sessionCount; i++ {
+		for _, productURL:= range productURLs {
+			maxReached, webshopKind, user, pass:= seleniumHandler.maxSessionsCreated(sessionCount, productURL.URL, globalConfig)
+			if !maxReached {
+				wg.Add(1)
+				go seleniumHandler.createSession(&wg, i, webshopKind, user, pass)	
+				time.Sleep(1 *time.Second)		
+			}
+		}
+	}
+	wg.Wait()
+
+	//check if session count is < sessionCount and return error if that is the case
+	if len(seleniumHandler.sessions) != sessionCount {
+		return nil, fmt.Errorf("Failed to start one or more selenium sessions")
+	}
+
+	go seleniumHandler.sessionKeepAlive(ctx)
+
+	return seleniumHandler, nil
 }
 
 
@@ -47,60 +76,30 @@ func (handler *SeleniumHandler) maxSessionsCreated(maxSessionCount int, url stri
 	return true, 0, "", ""
 }
 
-
-
-
-//New creates a new instance of this driver
-func New(sessionCount int, sigStopServerChan chan os.Signal, globalConfig structs.GlobalConfig, productURLs []*structs.ProductURL) (*SeleniumHandler, error) {
-	seleniumHandler := &SeleniumHandler{
-		sessions: make(map[structs.Webshop][]*Session),
-	}
-	var wg sync.WaitGroup
-	for i := 0; i < sessionCount; i++ {
-		for _, productURL:= range productURLs {
-			maxReached, webshopKind, user, pass:= seleniumHandler.maxSessionsCreated(sessionCount, productURL.URL, globalConfig)
-			if !maxReached {
-				wg.Add(1)
-				go seleniumHandler.createSession(&wg, i, webshopKind, user, pass)			
+//CloseAll closes all webdriver sessions and services related to selenium to prepare for graceful exit of the application
+func (handler *SeleniumHandler) CloseAll(){
+	handler.Lock()
+	for _, sessionList:= range handler.sessions {
+		for _, session:= range sessionList {
+			err:= session.webdriver.Close()
+			if err!= nil {
+				fmt.Println(err)
 			}
-		}
-	}
-	wg.Wait()
-
-	//check if session count is < sessionCount and return error if that is the case
-	if len(seleniumHandler.sessions) != sessionCount {
-		return nil, fmt.Errorf("Failed to start one or more selenium sessions")
-	}
-
-	go seleniumHandler.sessionKeepAlive(sigStopServerChan)
-
-	return seleniumHandler, nil
-}
-
-func (handler *SeleniumHandler) sessionKeepAlive(sigStopServerChan chan os.Signal) {
-	for {
-		select {
-		case <-sigStopServerChan:
-			fmt.Println("sessionKeepAlive goroutine exiting")
-			return
-		default:
-			handler.Lock()
-			for _, webshopSessions:= range handler.sessions {
-				for _, session:= range webshopSessions {
-					session.webdriver.Refresh()
-				}
+			err = session.webdriver.Quit()
+			if err!= nil {
+				fmt.Println(err)
 			}
-			handler.Unlock()
-
-			time.Sleep(time.Minute * 15)
-		}
-
+			err = session.seleniumService.Stop()
+			if err!= nil {
+				fmt.Println(err)
+			}
+		}	
 	}
+	handler.Unlock()
 }
 
 
-
-func (handler *SeleniumHandler) Checkout(webshop webshop.Webshop, product structs.ProductURL) error {
+func (handler *SeleniumHandler) Checkout(useAddToCartButton bool, webshop webshop.Webshop, product structs.ProductURL) error {
 
 	//refresh page
 	//handler.sessions[0].webdriver.Refresh()
@@ -109,7 +108,7 @@ func (handler *SeleniumHandler) Checkout(webshop webshop.Webshop, product struct
 		return fmt.Errorf("No free sessions available to checkout product %s", product.Name)
 	}
 
-	err := webshop.Checkout(product, session.webdriver)
+	err := webshop.Checkout(useAddToCartButton, product, session.webdriver)
 	if err != nil {
 		return fmt.Errorf("Failed to checkout product %s (%v)", product.Name, err)
 	}
@@ -129,7 +128,7 @@ func (handler *SeleniumHandler) createSession(wg *sync.WaitGroup, id int, websho
 
 	defer wg.Done()
 
-	webdriver, err:= handler.initAndLoginSession(id, webshopKind, username, password)
+	webdriver, seleniumSvc, err:= handler.initAndLoginSession(id, webshopKind, username, password)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("Failed to create selenium session (%v)", err))
 		//delete 
@@ -181,10 +180,11 @@ func (handler *SeleniumHandler) createSession(wg *sync.WaitGroup, id int, websho
 	*/
 	handler.Lock()
 	newSession.webdriver= webdriver
+	newSession.seleniumService = seleniumSvc
 	handler.Unlock()
 }
 
-func (handler *SeleniumHandler) initAndLoginSession(id int, webshopKind structs.Webshop, username, password string) (selenium.WebDriver, error) {
+func (handler *SeleniumHandler) initAndLoginSession(id int, webshopKind structs.Webshop, username, password string) (selenium.WebDriver, *selenium.Service, error) {
 	var (
 		// These paths will be different on your system.
 		seleniumPath     = "selenium/selenium-server/selenium-server-standalone-3.141.59.jar" //client-combined-3.141.59
@@ -194,11 +194,11 @@ func (handler *SeleniumHandler) initAndLoginSession(id int, webshopKind structs.
 	opts := []selenium.ServiceOption{
 		//selenium.StartFrameBuffer(),
 		selenium.ChromeDriver(chromeDriverPath),
-		selenium.Output(os.Stderr),
+		//selenium.Output(os.Stderr),
 	}
-	_, err := selenium.NewSeleniumService(seleniumPath, port, opts...)
+	seleniumSVC, err := selenium.NewSeleniumService(seleniumPath, port, opts...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	//defer service.Stop()
 
@@ -206,17 +206,17 @@ func (handler *SeleniumHandler) initAndLoginSession(id int, webshopKind structs.
 	caps := selenium.Capabilities{"browserName": "chrome"}
 	wd, err := selenium.NewRemote(caps, fmt.Sprintf("http://localhost:%d/wd/hub", port))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	signInURL, signInFunc:= getSignInURLAndFunc(webshopKind)
 	err = signInFunc(username, password, wd, signInURL)
 	if err != nil {
 		err = fmt.Errorf("Failed to log in for this session (%v)", err)
-		return nil, err
+		return nil, nil, err
 	}
 
-	return wd, nil
+	return wd, seleniumSVC, nil
 }
 
 //delete session that failed to init or whatever
@@ -274,6 +274,27 @@ func (handler *SeleniumHandler) getInactiveSession(webshopKind structs.Webshop) 
 		}
 	}
 	return nil
+}
+
+
+func (handler *SeleniumHandler) sessionKeepAlive(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			fmt.Println("sessionKeepAlive goroutine exiting")
+			return
+		default:
+			handler.Lock()
+			for _, webshopSessions:= range handler.sessions {
+				for _, session:= range webshopSessions {
+					session.webdriver.Refresh()
+				}
+			}
+			handler.Unlock()
+
+			time.Sleep(time.Minute * 15)
+		}
+	}
 }
 
 /*
