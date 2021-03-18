@@ -71,7 +71,7 @@ func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy struc
 	//we check if the body contains an expected element, if it does not, then something went wrong while loading the page
 	if !bodyOK && !inStock && !inStockCartButton{
 		err = fmt.Errorf("Body failed to properly load for some reason...")
-
+		/*
 		bytes, err2:= ioutil.ReadAll(bodyCopy)
 		if err2 != nil {
 			err = fmt.Errorf(err.Error() + ":" + "failed to read body (%v)", err2)
@@ -83,7 +83,7 @@ func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy struc
 			err = fmt.Errorf("%v (%v)", err, err2)
 			return false, false, false, nil, err
 		}
-
+*/
 		return false, false, false, nil, err
 	}
 
