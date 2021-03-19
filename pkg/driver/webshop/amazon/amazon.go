@@ -1,7 +1,6 @@
 package amazon
 
 import (
-	"io/ioutil"
 	"dolos-dev/pkg/helperfuncs"
 	"dolos-dev/pkg/structs"
 	"fmt"
@@ -21,7 +20,7 @@ type Webshop struct {
 //New instantiates a new instance of this driver
 func New(webshopKind structs.Webshop) *Webshop {
 	return &Webshop{
-		Kind: webshopKind ,
+		Kind: webshopKind,
 	}
 }
 
@@ -43,18 +42,6 @@ func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy struc
 		return false, false, false, nil, err
 	}
 
-	bytes, err2:= ioutil.ReadAll(body)
-	if err2 != nil {
-		err = fmt.Errorf(err.Error() + ":" + "failed to read body (%v)", err2)
-		return false, false, false, nil, err
-	}
-
-	err2 = helperfuncs.SaveBodyToHTML(bytes)
-	if err2 != nil {
-		err = fmt.Errorf("%v (%v)", err, err2)
-		return false, false, false, nil, err
-	}
-
 	bodyOK, inStock, inStockCartButton, captcha, captchaURL := checkStockStatus(body)
 
 	if captcha {
@@ -69,21 +56,21 @@ func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy struc
 	}
 
 	//we check if the body contains an expected element, if it does not, then something went wrong while loading the page
-	if !bodyOK && !inStock && !inStockCartButton{
+	if !bodyOK && !inStock && !inStockCartButton {
 		err = fmt.Errorf("Body failed to properly load for some reason...")
 		/*
-		bytes, err2:= ioutil.ReadAll(bodyCopy)
-		if err2 != nil {
-			err = fmt.Errorf(err.Error() + ":" + "failed to read body (%v)", err2)
-			return false, false, false, nil, err
-		}
+			bytes, err2 := ioutil.ReadAll(bodyCopy)
+			if err2 != nil {
+				err = fmt.Errorf(err.Error()+":"+"failed to read body (%v)", err2)
+				return false, false, false, nil, err
+			}
 
-		err2 = helperfuncs.SaveBodyToHTML(bytes)
-		if err2 != nil {
-			err = fmt.Errorf("%v (%v)", err, err2)
-			return false, false, false, nil, err
-		}
-*/
+			err2 = helperfuncs.SaveBodyToHTML(bytes)
+			if err2 != nil {
+				err = fmt.Errorf("%v (%v)", err, err2)
+				return false, false, false, nil, err
+			}*/
+
 		return false, false, false, nil, err
 	}
 
@@ -91,19 +78,19 @@ func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy struc
 }
 
 func getCountryCode(url string) string {
-	if strings.Contains(url, "amazon.com"){
+	if strings.Contains(url, "amazon.com") {
 		return ".com"
 	}
-	if strings.Contains(url, "amazon.fr"){
+	if strings.Contains(url, "amazon.fr") {
 		return ".fr"
 	}
-	if strings.Contains(url, "amazon.de"){
+	if strings.Contains(url, "amazon.de") {
 		return ".de"
 	}
-	if strings.Contains(url, "amazon.nl"){
+	if strings.Contains(url, "amazon.nl") {
 		return ".nl"
 	}
-	if strings.Contains(url, "amazon.it"){
+	if strings.Contains(url, "amazon.it") {
 		return ".it"
 	}
 	return "ERROR"
@@ -131,7 +118,6 @@ func (shop *Webshop) Checkout(useAddToCartButton bool, product structs.ProductUR
 	priceString = strings.ReplaceAll(priceString, "$", "")
 	priceString = strings.ReplaceAll(priceString, "€", "")
 
-	
 	price, err := strconv.ParseFloat(priceString, 32)
 	if err != nil {
 		return fmt.Errorf("Failed to parce price %s (%v)", priceString, err)
@@ -157,7 +143,7 @@ func (shop *Webshop) Checkout(useAddToCartButton bool, product structs.ProductUR
 
 		//url to go directly to checkout
 		webdriver.Get(fmt.Sprint("https://www.amazon", getCountryCode(product.URL), "/-/en/gp/cart/view.html/ref=lh_co?ie=UTF8&proceedToCheckout.x=129&cartInitiateId=1616029244603&hasWorkingJavascript=1"))
-	}else{
+	} else {
 		//find buy now button
 		elemBuyNowButton, err := webdriver.FindElement(selenium.ByCSSSelector, "#buy-now-button")
 		if err != nil {
@@ -198,7 +184,7 @@ func LogInSelenium(username, password string, webdriver selenium.WebDriver, sign
 
 	//navigate to sign in page
 	fmt.Println("Signing in")
-	            //https://www.amazon.nl /ap/signin?openid.pape.max_auth_age=0                                                                     &openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=nlflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0&
+	//https://www.amazon.nl /ap/signin?openid.pape.max_auth_age=0                                                                     &openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=nlflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0&
 	//signInURL := "https://www.amazon.com/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.com%2F%3Fref_%3Dnav_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=usflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0&"
 	if err := webdriver.Get(signInURL); err != nil {
 		return err
@@ -249,8 +235,6 @@ func LogInSelenium(username, password string, webdriver selenium.WebDriver, sign
 	}
 	elemSignIn.Click()
 
-
-
 	//WAIT FOR  to appear
 
 	webdriver.Wait(func(wd selenium.WebDriver) (bool, error) {
@@ -268,10 +252,69 @@ func LogInSelenium(username, password string, webdriver selenium.WebDriver, sign
 	return nil
 }
 
+func (shop *Webshop) SolveCaptcha(webdriver selenium.WebDriver, captchaToken string) error {
+
+	//solve captchaaaa
+
+	return nil
+}
+
+func (shop *Webshop) CheckStockStatusSelenium(webdriver selenium.WebDriver, productURL structs.ProductURL) (bool, bool, bool, string, error) {
+	err := webdriver.Get(productURL.URL)
+	if err != nil {
+		return false, false, false, "", err
+	}
+
+	_, err = webdriver.FindElement(selenium.ByCSSSelector, "#productTitle")
+	if err != nil {
+		//couldn't find product title. Maybe captcha?
+		images, err := webdriver.FindElements(selenium.ByTagName, "#img")
+		if err != nil {
+			err = fmt.Errorf("Page not correctly loaded (%v)", err)
+			return false, false, false, "", err
+		}
+		for _, img := range images {
+			imgSrc, err := img.GetAttribute("src")
+			if err != nil {
+				err = fmt.Errorf("img has no src attribute (%v)", err)
+
+			} else {
+				if strings.Contains(imgSrc, "captcha") {
+					return false, false, true, imgSrc, err
+				}
+
+			}
+		}
+		err = fmt.Errorf("captcha img not found... ")
+
+		return false, false, false, "", err
+	}
+
+	_, err = webdriver.FindElement(selenium.ByID, "buy-now-button")
+	if err == nil {
+		return true, false, false, "", nil
+	}
+
+	_, err = webdriver.FindElement(selenium.ByID, "add-to-cart-button")
+	if err == nil {
+		return true, true, false, "", nil
+	}
+	/*
+		if a.Val == "buy-now-button" {
+			return bodyOK, true, false, false, ""
+		}
+
+		if a.Val == "add-to-cart-button" {
+			return bodyOK, true, true, false, ""
+		}
+	*/
+	return false, false, false, "", nil
+}
+
 func checkStockStatus(body io.ReadCloser) (bool, bool, bool, bool, string) {
 	var findElement func(bool, *html.Node) (bool, bool, bool, bool, string)
 	findElement = func(bodyAlreadyFound bool, n *html.Node) (bool, bool, bool, bool, string) {
-		bodyOK:= bodyAlreadyFound
+		bodyOK := bodyAlreadyFound
 		if n.Type == html.ElementNode {
 			if n.Data == "span" && !bodyOK {
 				for _, a := range n.Attr {
@@ -296,12 +339,11 @@ func checkStockStatus(body io.ReadCloser) (bool, bool, bool, bool, string) {
 						if a.Val == "buy-now-button" {
 							return bodyOK, true, false, false, ""
 						}
-						
+
 						if a.Val == "add-to-cart-button" {
 							return bodyOK, true, true, false, ""
 						}
 
-						
 					}
 				}
 			}
@@ -321,7 +363,7 @@ func checkStockStatus(body io.ReadCloser) (bool, bool, bool, bool, string) {
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
 			newBodyOK, inStock, inStockCartButton, captcha, captchaURL := findElement(bodyOK, c)
 			bodyOK = newBodyOK
-			if inStock || inStockCartButton || captcha  {
+			if inStock || inStockCartButton || captcha {
 				return bodyOK, inStock, inStockCartButton, captcha, captchaURL
 			}
 

@@ -91,7 +91,7 @@ func FindNextProxy(currentProxy *structs.Proxy, proxies []*structs.Proxy, websho
 
 func getRelevantLastUsedTime(webshopKind structs.Webshop, proxy *structs.Proxy) time.Time {
 	switch webshopKind {
-	case structs.WEBSHOP_AMAZON:
+	case structs.WEBSHOP_AMAZON, structs.WEBSHOP_AMAZONNL, structs.WEBSHOP_AMAZONDE, structs.WEBSHOP_AMAZONIT, structs.WEBSHOP_AMAZONFR:
 		return proxy.LastUsedAmazon
 	}
 

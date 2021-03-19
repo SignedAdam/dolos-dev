@@ -9,24 +9,26 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
-	cmdcolor"github.com/TwinProduction/go-color"
+
+	cmdcolor "github.com/TwinProduction/go-color"
 )
 
 func (handler *StockAlertHandler) addMetrics(str string, taskID int) string {
-	taskIDPrefix:= ""
+	taskIDPrefix := ""
 	if taskID > 0 {
 		taskIDPrefix = fmt.Sprint(cmdcolor.Bold, cmdcolor.Red, "#", taskID, "://")
 	}
 	handler.mutex.RLock()
-	str = fmt.Sprint(cmdcolor.Bold, cmdcolor.Gray, " [", cmdcolor.Blue, " B: ", handler.metrics.inStockSeen, cmdcolor.Green, " | S: ",  handler.metrics.heBorght, cmdcolor.Yellow,  " | C: ", handler.metrics.captchaSeen, cmdcolor.Gray, " ] ", cmdcolor.Reset,  str)
+	str = fmt.Sprint(cmdcolor.Bold, cmdcolor.Gray, " [", cmdcolor.Blue, " B: ", handler.metrics.inStockSeen, cmdcolor.Green, " | S: ", handler.metrics.heBorght, cmdcolor.Yellow, " | C: ", handler.metrics.captchaSeen, cmdcolor.Gray, " ] ", cmdcolor.Reset, str)
 	handler.mutex.RUnlock()
 
-	str = fmt.Sprint(taskIDPrefix,str)
+	str = fmt.Sprint(taskIDPrefix, str)
 
 	return str
 }
 
 func (handler *StockAlertHandler) stockChecker(ctx context.Context, productURL structs.ProductURL, globalConfig structs.GlobalConfig, taskID int) {
+
 	webshop, webshopKind, err := switcher.GetWebshop(productURL.URL)
 	if err != nil {
 		helperfuncs.Log(handler.addMetrics("Failed to init webshop interface (%v)", taskID), err)
@@ -43,7 +45,7 @@ func (handler *StockAlertHandler) stockChecker(ctx context.Context, productURL s
 	)
 
 	switch webshopKind {
-	case structs.WEBSHOP_AMAZON:
+	case structs.WEBSHOP_AMAZON, structs.WEBSHOP_AMAZONNL, structs.WEBSHOP_AMAZONIT, structs.WEBSHOP_AMAZONFR, structs.WEBSHOP_AMAZONDE:
 		stockCheckInterval = globalConfig.AmazonStockCheckInterval
 		globalProxyLifetime = globalConfig.AmazonProxyLifetime
 		useProxies = globalConfig.AmazonUseProxies
@@ -65,6 +67,15 @@ func (handler *StockAlertHandler) stockChecker(ctx context.Context, productURL s
 		lastProxySet = time.Now()
 	}
 
+	handler.mutex.Lock()
+	seleniumSession, err := handler.seleniumHandler.NewSession(&proxyCopy)
+	handler.mutex.Unlock()
+	if err != nil {
+		helperfuncs.Log(handler.addMetrics("Failed to init selenium instance for this task (%v)", taskID), err)
+	}
+
+	_ = seleniumSession
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -73,14 +84,15 @@ func (handler *StockAlertHandler) stockChecker(ctx context.Context, productURL s
 			return
 		default:
 
-			status, useAddToCartButton, captcha, captchaData, err := webshop.CheckStockStatus(productURL, proxyCopy)
+			//status, useAddToCartButton, captcha, captchaData, err := webshop.CheckStockStatus(productURL, proxyCopy)
+			status, useAddToCartButton, captcha, captchaData, err := seleniumSession.CheckStockStatus(productURL, proxyCopy, webshop)
 			if err != nil {
 				helperfuncs.Log(handler.addMetrics("Failed to check stock for %s [URL: %s] (%v)", taskID), productURL.Name, productURL.URL, err)
 			}
 
 			if captcha {
 				helperfuncs.Log(handler.addMetrics("Captcha found", taskID))
-				
+
 				if captchaData.CaptchaURL == "" {
 					helperfuncs.Log(handler.addMetrics("Captcha does not have a URL", taskID))
 
@@ -88,7 +100,7 @@ func (handler *StockAlertHandler) stockChecker(ctx context.Context, productURL s
 					//put session key and captcha data into CaptchaSolverMap
 					handler.mutex.Lock()
 					handler.CaptchaSolver[captchaData.SessionID] = captchaData
-					handler.metrics.captchaSeen ++
+					handler.metrics.captchaSeen++
 					handler.mutex.Unlock()
 
 					captchaToken, err := captchasolver.SolveCaptcha(captchaData.CaptchaURL, globalConfig.CaptchaSolverEndpoint)
@@ -134,24 +146,23 @@ func (handler *StockAlertHandler) stockChecker(ctx context.Context, productURL s
 			} else {
 				if status {
 					helperfuncs.Log(handler.addMetrics(fmt.Sprint("Product ", productURL.Name, " is in stock!!!!!"), taskID))
-					
+
 					if !productURL.OnlyCheckStock {
 						handler.mutex.RLock()
 						err = handler.seleniumHandler.Checkout(useAddToCartButton, webshop, productURL)
 						handler.mutex.RUnlock()
-	
-	
+
 						if err != nil {
 							helperfuncs.Log(handler.addMetrics("Failed to buy %s (%v)", taskID), productURL.Name, err)
 						} else {
 							handler.mutex.Lock()
 							handler.metrics.heBorght++
-							
+
 							if productURL.MaxPurchases > 0 {
 								//find current product in list
-								for _, product:= range handler.ProductURLs {
+								for _, product := range handler.ProductURLs {
 									if product.ID == productURL.ID {
-										product.CurrentPurchases ++
+										product.CurrentPurchases++
 										if product.CurrentPurchases >= product.MaxPurchases {
 											helperfuncs.Log(handler.addMetrics("Completed purchase quota for product %s. Stopping task", taskID), productURL.Name)
 											handler.mutex.Unlock()
@@ -162,7 +173,7 @@ func (handler *StockAlertHandler) stockChecker(ctx context.Context, productURL s
 								}
 							}
 							handler.mutex.Unlock()
-	
+
 							helperfuncs.Log(handler.addMetrics("============", taskID))
 							helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
 							helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
@@ -172,7 +183,7 @@ func (handler *StockAlertHandler) stockChecker(ctx context.Context, productURL s
 							helperfuncs.Log(handler.addMetrics("============", taskID))
 						}
 					}
-					
+
 					handler.mutex.Lock()
 					handler.metrics.inStockSeen++
 					handler.mutex.Unlock()
@@ -183,7 +194,7 @@ func (handler *StockAlertHandler) stockChecker(ctx context.Context, productURL s
 				if useProxies {
 					//check if proxy needs to be updated
 					if lastProxySet.Add(time.Duration(globalProxyLifetime)*time.Minute).Before(time.Now()) && proxyLifecycle {
-						helperfuncs.Log(handler.addMetrics("\n==================================================\nchanging proxies from: " + proxyCopy.IP, taskID))
+						helperfuncs.Log(handler.addMetrics("\n==================================================\nchanging proxies from: "+proxyCopy.IP, taskID))
 						handler.mutex.Lock()
 						proxy, err = helperfuncs.FindNextProxy(proxy, handler.Proxies, webshopKind, globalProxyLifetime)
 						proxyCopy = *proxy
@@ -192,7 +203,12 @@ func (handler *StockAlertHandler) stockChecker(ctx context.Context, productURL s
 							helperfuncs.Log(handler.addMetrics("Failed to get next proxy for %s [URL: %s] (%v)", taskID), productURL.Name, productURL.URL, err)
 							return
 						}
-						helperfuncs.Log(handler.addMetrics(" to " + proxyCopy.IP + "\n==================================================\n", taskID))
+						helperfuncs.Log(handler.addMetrics(" to "+proxyCopy.IP+"\n==================================================\n", taskID))
+
+						handler.mutex.Lock()
+						seleniumSession.Webdriver.Quit()
+						seleniumSession, err = handler.seleniumHandler.NewSession(&proxyCopy)
+						handler.mutex.Unlock()
 
 						lastProxySet = time.Now()
 					}

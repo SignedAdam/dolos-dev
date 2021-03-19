@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,7 +11,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	"context"
 
 	seleniumdriver "dolos-dev/pkg/driver/selenium"
 	"dolos-dev/pkg/helperfuncs"
@@ -33,7 +33,7 @@ type StockAlertHandler struct {
 
 type metrics struct {
 	inStockSeen int
-	heBorght int
+	heBorght    int
 	captchaSeen int
 }
 
@@ -59,21 +59,26 @@ func main() {
 	}
 	helperfuncs.Log("Configuration files loaded: \n\t%v product config(s) found \n\t%v proxies found", len(handler.ProductURLs), len(handler.Proxies))
 
-	//TODO username and pass from globalconfig
-	seleniumHandler, err := seleniumdriver.New(1, ctx, *handler.GlobalConfig, handler.ProductURLs)
+	seleniumHandler, err := seleniumdriver.Init()
 	if err != nil {
-		helperfuncs.Log("Failed to start selenium browser instances (%v)", err)
+		helperfuncs.Log("Failed to init selenium service (%v)", err)
 	}
 	handler.seleniumHandler = seleniumHandler
 
-	ij:= 0
+	//TODO username and pass from globalconfig
+	err = seleniumHandler.CreateCheckoutSessions(1, ctx, *handler.GlobalConfig, handler.ProductURLs)
+	if err != nil {
+		helperfuncs.Log("Failed to start selenium browser instances (%v)", err)
+	}
+
+	ij := 0
 	for _, product := range handler.ProductURLs {
 		for i := 0; i < product.Threads; i++ {
 			ij++
 			time.Sleep(500 * time.Millisecond)
-			handler.mutex.Lock()
-			go handler.stockChecker(ctx, *product, *handler.GlobalConfig, ij)
-			handler.mutex.Unlock()
+			//handler.mutex.Lock()
+			handler.stockChecker(ctx, *product, *handler.GlobalConfig, ij)
+			//handler.mutex.Unlock()
 		}
 	}
 
@@ -89,7 +94,7 @@ func main() {
 	//serve the API on port 3077
 	go http.ListenAndServe(":3077", mux)
 
-	<- ctx.Done()
+	<-ctx.Done()
 
 	log.Println("server stopped")
 }
@@ -98,7 +103,7 @@ func (handler *StockAlertHandler) exitHandler(ctx context.Context) {
 	<-ctx.Done()
 	handler.mutex.Lock()
 	handler.seleniumHandler.CloseAll()
-	handler.mutex.Unlock()	
+	handler.mutex.Unlock()
 	fmt.Println("Closed all selenium related processes")
 }
 
