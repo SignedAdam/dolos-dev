@@ -5,7 +5,6 @@ import (
 	"dolos-dev/pkg/helperfuncs"
 	"dolos-dev/pkg/structs"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -46,43 +45,19 @@ func createPluginZip(proxy structs.Proxy) (string, error) {
 		return "", fmt.Errorf("failed to create a background.js file (%v)", err)
 	}
 
-	if err = AddFileToZip(zipWriter, fmt.Sprintf("selenium/%s/background.js", sessionID), "background.js"); err != nil {
+	if err = helperfuncs.AddFileToZip(zipWriter, fmt.Sprintf("selenium/%s/background.js", sessionID), "background.js"); err != nil {
 		return "", err
 	}
 
-	if err = AddFileToZip(zipWriter, "selenium/proxy/manifest.json", "manifest.json"); err != nil {
+	if err = helperfuncs.AddFileToZip(zipWriter, "selenium/proxy/manifest.json", "manifest.json"); err != nil {
+		return "", err
+	}
+
+	//delete folder
+	err = helperfuncs.DeleteFileOrDir(fmt.Sprintf("selenium/%s/", sessionID))
+	if err != nil {
 		return "", err
 	}
 
 	return fmt.Sprintf("selenium/plugin%s.zip", sessionID), nil
-}
-
-func AddFileToZip(zipWriter *zip.Writer, filePath, fileName string) error {
-
-	fileToZip, err := os.Open(filePath)
-	if err != nil {
-		return err
-	}
-	defer fileToZip.Close()
-
-	// Get the file information
-	info, err := fileToZip.Stat()
-	if err != nil {
-		return err
-	}
-
-	header, err := zip.FileInfoHeader(info)
-	if err != nil {
-		return err
-	}
-
-	header.Name = fileName
-	header.Method = zip.Deflate
-
-	writer, err := zipWriter.CreateHeader(header)
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(writer, fileToZip)
-	return err
 }

@@ -8,6 +8,7 @@ import (
 	"dolos-dev/pkg/switcher"
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 
 	cmdcolor "github.com/TwinProduction/go-color"
@@ -27,11 +28,13 @@ func (handler *StockAlertHandler) addMetrics(str string, taskID int) string {
 	return str
 }
 
-func (handler *StockAlertHandler) stockChecker(ctx context.Context, productURL structs.ProductURL, globalConfig structs.GlobalConfig, taskID int) {
+func (handler *StockAlertHandler) stockChecker(wgSeleniumExit *sync.WaitGroup, ctx context.Context, productURL structs.ProductURL, globalConfig structs.GlobalConfig, taskID int) {
 
 	webshop, webshopKind, err := switcher.GetWebshop(productURL.URL)
 	if err != nil {
 		helperfuncs.Log(handler.addMetrics("Failed to init webshop interface (%v)", taskID), err)
+		wgSeleniumExit.Done()
+		return
 	}
 
 	var (
@@ -61,6 +64,7 @@ func (handler *StockAlertHandler) stockChecker(ctx context.Context, productURL s
 		handler.mutex.RUnlock()
 		if err != nil {
 			helperfuncs.Log(handler.addMetrics("Failed to get next proxy for %s [URL: %s] (%v)", taskID), productURL.Name, productURL.URL, err)
+			wgSeleniumExit.Done()
 			return
 		}
 		proxyCopy = *proxy
@@ -72,6 +76,8 @@ func (handler *StockAlertHandler) stockChecker(ctx context.Context, productURL s
 	handler.mutex.Unlock()
 	if err != nil {
 		helperfuncs.Log(handler.addMetrics("Failed to init selenium instance for this task (%v)", taskID), err)
+		wgSeleniumExit.Done()
+		return
 	}
 
 	_ = seleniumSession
@@ -81,6 +87,11 @@ func (handler *StockAlertHandler) stockChecker(ctx context.Context, productURL s
 		case <-ctx.Done():
 			//if the sigStopChan channel is signalled then we return from the function to kill the thread
 			helperfuncs.Log(handler.addMetrics("Exiting stockChecker thread", taskID))
+			err = seleniumSession.Webdriver.Quit()
+			if err != nil {
+				fmt.Println(err)
+			}
+			wgSeleniumExit.Done()
 			return
 		default:
 
@@ -166,6 +177,7 @@ func (handler *StockAlertHandler) stockChecker(ctx context.Context, productURL s
 										if product.CurrentPurchases >= product.MaxPurchases {
 											helperfuncs.Log(handler.addMetrics("Completed purchase quota for product %s. Stopping task", taskID), productURL.Name)
 											handler.mutex.Unlock()
+											wgSeleniumExit.Done()
 											return
 										}
 										break
@@ -201,6 +213,7 @@ func (handler *StockAlertHandler) stockChecker(ctx context.Context, productURL s
 						handler.mutex.Unlock()
 						if err != nil {
 							helperfuncs.Log(handler.addMetrics("Failed to get next proxy for %s [URL: %s] (%v)", taskID), productURL.Name, productURL.URL, err)
+							wgSeleniumExit.Done()
 							return
 						}
 						helperfuncs.Log(handler.addMetrics(" to "+proxyCopy.IP+"\n==================================================\n", taskID))
@@ -213,7 +226,6 @@ func (handler *StockAlertHandler) stockChecker(ctx context.Context, productURL s
 						lastProxySet = time.Now()
 					}
 				}
-
 			}
 
 			time.Sleep(time.Duration(stockCheckInterval+rand.Intn(globalConfig.AmazonStockCheckIntervalDeviation)) * time.Millisecond)

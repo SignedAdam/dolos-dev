@@ -4,15 +4,15 @@ import "time"
 
 //ProductURL represents a single product and the necessary data to check its stock
 type ProductURL struct {
-	ID 		 int `json:"id"`
-	Name     string
-	URL      string
-	MinPrice int `json:"min_price"`
-	MaxPrice int `json:"max_price"`
-	Threads  int
-	MaxPurchases int `json:"max_purchases"`
+	ID               int `json:"id"`
+	Name             string
+	URL              string
+	MinPrice         int `json:"min_price"`
+	MaxPrice         int `json:"max_price"`
+	Threads          int
+	MaxPurchases     int `json:"max_purchases"`
 	CurrentPurchases int
-	OnlyCheckStock bool `json:"only_check_stock"`
+	OnlyCheckStock   bool `json:"only_check_stock"`
 }
 
 type CaptchaWrapper struct {
@@ -23,13 +23,15 @@ type CaptchaWrapper struct {
 }
 
 type GlobalConfig struct {
+	CaptchaSolverEndpoint       string `json:"captcha_solver_endpoint"`
+	CheckoutInstancesPerWebshop int    `json:"checkout_instances_per_webshop"`
+
 	AmazonStockCheckInterval          int    `json:"amazon_stock_check_interval"`
 	AmazonStockCheckIntervalDeviation int    `json:"amazon_stock_check_interval_deviation"`
 	AmazonUseProxies                  bool   `json:"amazon_use_proxies"`
 	AmazonProxyLifetime               int    `json:"amazon_proxy_lifetime"`
-	AmazonUsername 					  string `json:"amazon_username"`
-	AmazonPassword 					  string `json:"amazon_password"`
-	CaptchaSolverEndpoint             string `json:"captcha_solver_endpoint"`
+	AmazonUsername                    string `json:"amazon_username"`
+	AmazonPassword                    string `json:"amazon_password"`
 }
 
 type Proxy struct {
@@ -44,8 +46,8 @@ type Proxy struct {
 type Webshop int
 
 const (
-	WEBSHOP_NONE   Webshop = 0
-	WEBSHOP_AMAZON Webshop = 1
+	WEBSHOP_NONE     Webshop = 0
+	WEBSHOP_AMAZON   Webshop = 1
 	WEBSHOP_AMAZONNL Webshop = 2
 	WEBSHOP_AMAZONDE Webshop = 3
 	WEBSHOP_AMAZONIT Webshop = 4

@@ -18,21 +18,21 @@ import (
 type SeleniumHandler struct {
 	seleniumService *selenium.Service
 	sessions        map[structs.Webshop][]*Session
-	lastPort        int
+	//lastPort        int
 	sync.RWMutex
 }
 
 //Session represents a single selenium webdriver and has a flag 'busy' to indicate whether or not it is being used by another task
 type Session struct {
-	id              int
-	webdriver       selenium.WebDriver
-	seleniumService *selenium.Service
-	busy            bool
+	id        int
+	webdriver selenium.WebDriver
+	//seleniumService *selenium.Service
+	busy bool
 }
 
 type SingleSession struct {
-	Webdriver       selenium.WebDriver
-	SeleniumService *selenium.Service
+	Webdriver selenium.WebDriver
+	//SeleniumService *selenium.Service
 }
 
 //New creates a new instance of this driver
@@ -48,7 +48,7 @@ func (handler *SeleniumHandler) CreateCheckoutSessions(sessionCount int, ctx con
 			if !maxReached {
 				wg.Add(1)
 				go handler.createSession(&wg, i, webshopKind, user, pass)
-				time.Sleep(1 * time.Second)
+				time.Sleep(5 * time.Second)
 			}
 		}
 	}
@@ -87,11 +87,13 @@ func Init() (*SeleniumHandler, error) {
 }
 
 func (handler *SeleniumHandler) NewSession(proxy *structs.Proxy) (*SingleSession, error) {
-	handler.Lock()
-	handler.lastPort = handler.lastPort + 1
-	port := handler.lastPort
-	handler.Unlock()
-	wd, err := createSingleSession(port, proxy)
+	/*
+		handler.Lock()
+		handler.lastPort = handler.lastPort + 1
+		port := handler.lastPort
+		handler.Unlock()
+	*/
+	wd, err := createSingleSession( /*port,*/ proxy)
 	if err != nil {
 		return nil, err
 	}
@@ -100,6 +102,77 @@ func (handler *SeleniumHandler) NewSession(proxy *structs.Proxy) (*SingleSession
 		Webdriver: wd,
 	}, nil
 
+}
+
+func (handler *SeleniumHandler) createSession(wg *sync.WaitGroup, id int, webshopKind structs.Webshop, username, password string) {
+	//we add the session to the handler immediately, so any parent functions will already know it's being worked on
+	newSession := &Session{
+		id: id,
+	}
+	handler.addSessionSafe(webshopKind, newSession)
+
+	defer wg.Done()
+
+	webdriver, err := handler.initAndLoginSession(id, webshopKind, username, password)
+	if err != nil {
+		fmt.Println(fmt.Sprintf("Failed to create selenium session (%v)", err))
+		//delete
+		handler.deleteBadSession(id, webshopKind)
+		return
+	}
+
+	handler.Lock()
+	newSession.webdriver = webdriver
+	handler.Unlock()
+}
+
+func createSingleSession( /*port int,*/ proxy *structs.Proxy) (selenium.WebDriver, error) {
+	/*var (
+		// These paths will be different on your system.
+		seleniumPath     = "selenium/selenium-server/selenium-server-standalone-3.141.59.jar" //client-combined-3.141.59
+		chromeDriverPath = "selenium/chrome-driver/chromedriver.exe"
+	)
+
+	opts := []selenium.ServiceOption{
+		//selenium.StartFrameBuffer(),
+		selenium.ChromeDriver(chromeDriverPath),
+		//selenium.Output(os.Stderr),
+
+	}
+	seleniumSVC, err := selenium.NewSeleniumService(seleniumPath, port, opts...)
+	if err != nil {
+		return nil, nil, err
+	}
+	//defer service.Stop()
+	*/
+	caps := selenium.Capabilities{"browserName": "chrome"}
+
+	//add proxy to this instance's capabilities
+	//var pluginPath string
+	if proxy != nil {
+		pluginPath, err := createPluginZip(*proxy)
+		if err != nil {
+			return nil, err
+		}
+
+		chromeCaps := chrome.Capabilities{}
+
+		chromeCaps.AddExtension(pluginPath)
+		caps.AddChrome(chromeCaps)
+
+		err = helperfuncs.DeleteFileOrDir(pluginPath)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Connect to the WebDriver instance running locally.
+	wd, err := selenium.NewRemote(caps, fmt.Sprintf("http://localhost:%d/wd/hub", 8099))
+	if err != nil {
+		return nil, err
+	}
+
+	return wd, nil
 }
 
 func (session *SingleSession) SolveCaptcha(captchaToken string, webshop webshop.Webshop) error {
@@ -145,84 +218,8 @@ func (handler *SeleniumHandler) Checkout(useAddToCartButton bool, webshop websho
 	return nil
 }
 
-func (handler *SeleniumHandler) createSession(wg *sync.WaitGroup, id int, webshopKind structs.Webshop, username, password string) {
-	//we add the session to the handler immediately, so any parent functions will already know it's being worked on
-	newSession := &Session{
-		id: id,
-	}
-	handler.addSessionSafe(webshopKind, newSession)
-
-	defer wg.Done()
-
-	webdriver, err := handler.initAndLoginSession(id, webshopKind, username, password)
-	if err != nil {
-		fmt.Println(fmt.Sprintf("Failed to create selenium session (%v)", err))
-		//delete
-		handler.deleteBadSession(id, webshopKind)
-		return
-	}
-
-	handler.Lock()
-	newSession.webdriver = webdriver
-	handler.Unlock()
-}
-
-func createSingleSession(port int, proxy *structs.Proxy) (selenium.WebDriver, error) {
-	/*var (
-		// These paths will be different on your system.
-		seleniumPath     = "selenium/selenium-server/selenium-server-standalone-3.141.59.jar" //client-combined-3.141.59
-		chromeDriverPath = "selenium/chrome-driver/chromedriver.exe"
-	)
-
-	opts := []selenium.ServiceOption{
-		//selenium.StartFrameBuffer(),
-		selenium.ChromeDriver(chromeDriverPath),
-		//selenium.Output(os.Stderr),
-
-	}
-	seleniumSVC, err := selenium.NewSeleniumService(seleniumPath, port, opts...)
-	if err != nil {
-		return nil, nil, err
-	}
-	//defer service.Stop()
-	*/
-	caps := selenium.Capabilities{"browserName": "chrome"}
-
-	//add proxy to this instance's capabilities
-	if proxy != nil {
-
-		//proxyStr := fmt.Sprint( /*proxy.User, ":", proxy.Password, ":",*/ proxy.IP, ":", proxy.Port)
-		/*seleniumProxy := selenium.Proxy{
-			Type: selenium.Manual,
-			HTTP: proxyStr,
-			SSL:  proxyStr,
-		}
-		caps.AddProxy(seleniumProxy)
-		_ = proxyStr
-		*/
-
-		pluginPath, err := createPluginZip(*proxy)
-		if err != nil {
-			return nil, err
-		}
-
-		chromeCaps := chrome.Capabilities{}
-
-		chromeCaps.AddExtension(pluginPath)
-		caps.AddChrome(chromeCaps)
-	}
-
-	// Connect to the WebDriver instance running locally.
-	wd, err := selenium.NewRemote(caps, fmt.Sprintf("http://localhost:%d/wd/hub", 8099))
-	if err != nil {
-		return nil, err
-	}
-
-	return wd, nil
-}
-
 func (handler *SeleniumHandler) initAndLoginSession(id int, webshopKind structs.Webshop, username, password string) (selenium.WebDriver, error) {
-	wd, err := createSingleSession(8099+id, nil)
+	wd, err := createSingleSession( /*8099+id, */ nil)
 	if err != nil {
 		return nil, err
 	}
@@ -262,19 +259,25 @@ func (handler *SeleniumHandler) CloseAll() {
 	handler.Lock()
 	for _, sessionList := range handler.sessions {
 		for _, session := range sessionList {
-			err := session.webdriver.Close()
+			fmt.Println(fmt.Sprintf("Closing selenium instance %v", session.id))
+			/*err := session.webdriver.Close()
+			if err != nil {
+				fmt.Println(err)
+			}*/
+			err := session.webdriver.Quit()
 			if err != nil {
 				fmt.Println(err)
 			}
-			err = session.webdriver.Quit()
+			/*err = session.seleniumService.Stop()
 			if err != nil {
 				fmt.Println(err)
-			}
-			err = session.seleniumService.Stop()
-			if err != nil {
-				fmt.Println(err)
-			}
+			}*/
 		}
+	}
+	fmt.Println("Closing selenium service")
+	err := handler.seleniumService.Stop()
+	if err != nil {
+		fmt.Println(err)
 	}
 	handler.Unlock()
 }

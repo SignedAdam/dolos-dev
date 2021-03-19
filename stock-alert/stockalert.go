@@ -38,19 +38,30 @@ type metrics struct {
 }
 
 func main() {
-	sigStopServerChan := make(chan os.Signal, 1)
-	signal.Notify(sigStopServerChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGQUIT)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		<-sigStopServerChan
-		log.Println("sig int received - stopping everything")
-		cancel()
-	}()
+	sigStopServerSignal := make(chan os.Signal, 1)
+	chanReadyForExit := make(chan bool, 1)
+	var wgSeleniumExit sync.WaitGroup
+	signal.Notify(sigStopServerSignal, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGQUIT)
 
 	handler := StockAlertHandler{
 		CaptchaSolver: make(map[string]*structs.CaptchaWrapper),
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		<-sigStopServerSignal
+		log.Println("Stopping server...")
+		cancel()
+		//wait for all selenium stock checker processes to be terminated
+		wgSeleniumExit.Wait()
+		fmt.Println("Exiting all checkout processes")
+		handler.mutex.Lock()
+		handler.seleniumHandler.CloseAll()
+		fmt.Println("Closed all selenium checkout related processes")
+		handler.exitHandler()
+		handler.mutex.Unlock()
+		chanReadyForExit <- true
+	}()
 
 	err := helperfuncs.LoadAllConfigs(&handler.ProductURLs, &handler.GlobalConfig, &handler.Proxies)
 	if err != nil {
@@ -75,14 +86,14 @@ func main() {
 	for _, product := range handler.ProductURLs {
 		for i := 0; i < product.Threads; i++ {
 			ij++
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(5000 * time.Millisecond)
 			handler.mutex.Lock()
-			go handler.stockChecker(ctx, *product, *handler.GlobalConfig, ij)
+			go handler.stockChecker(&wgSeleniumExit, ctx, *product, *handler.GlobalConfig, ij)
 			handler.mutex.Unlock()
+			wgSeleniumExit.Add(1)
 		}
 	}
 
-	go handler.exitHandler(ctx)
 	//Initialize our REST API router & endpoints
 	mux := http.NewServeMux()
 
@@ -94,17 +105,13 @@ func main() {
 	//serve the API on port 3077
 	go http.ListenAndServe(":3077", mux)
 
-	<-ctx.Done()
+	<-chanReadyForExit
 
-	log.Println("server stopped")
+	log.Println("Server stopped")
 }
 
-func (handler *StockAlertHandler) exitHandler(ctx context.Context) {
-	<-ctx.Done()
-	handler.mutex.Lock()
-	handler.seleniumHandler.CloseAll()
-	handler.mutex.Unlock()
-	fmt.Println("Closed all selenium related processes")
+func (handler *StockAlertHandler) exitHandler() {
+
 }
 
 //CaptchaSolverHandler handles http requests for solving captcha
