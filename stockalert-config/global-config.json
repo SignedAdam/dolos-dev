@@ -1,10 +1,12 @@
 {
+    "captcha_solver_endpoint": "http://142.196.182.123:5000/solve",
+    "checkout_instances_per_webshop": 2,
+
     "amazon_stock_check_interval": 1000,
     "amazon_stock_check_interval_deviation": 500,
-    "amazon_use_proxies": false,
-    "amazon_proxy_lifetime": 999999,
-    "amazon_username": "bkcourtsecrets@gmail.com",
-    "amazon_password": "t3chb0t",
+    "amazon_use_proxies": true,
+    "amazon_proxy_lifetime": 99999,
+    "amazon_username": "SuperCharged@hotmail.be",
+    "amazon_password": "MSxehSzRIjw1"
 
-    "captcha_solver_endpoint": "http://142.196.182.123:5000/solve"
 }

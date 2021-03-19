@@ -66,7 +66,7 @@ func main() {
 	handler.seleniumHandler = seleniumHandler
 
 	//TODO username and pass from globalconfig
-	err = seleniumHandler.CreateCheckoutSessions(1, ctx, *handler.GlobalConfig, handler.ProductURLs)
+	err = seleniumHandler.CreateCheckoutSessions(handler.GlobalConfig.CheckoutInstancesPerWebshop, ctx, *handler.GlobalConfig, handler.ProductURLs)
 	if err != nil {
 		helperfuncs.Log("Failed to start selenium browser instances (%v)", err)
 	}
