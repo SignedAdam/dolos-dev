@@ -76,9 +76,9 @@ func main() {
 		for i := 0; i < product.Threads; i++ {
 			ij++
 			time.Sleep(500 * time.Millisecond)
-			//handler.mutex.Lock()
-			handler.stockChecker(ctx, *product, *handler.GlobalConfig, ij)
-			//handler.mutex.Unlock()
+			handler.mutex.Lock()
+			go handler.stockChecker(ctx, *product, *handler.GlobalConfig, ij)
+			handler.mutex.Unlock()
 		}
 	}
 
