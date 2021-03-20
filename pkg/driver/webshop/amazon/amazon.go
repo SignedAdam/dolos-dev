@@ -58,18 +58,6 @@ func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy struc
 	//we check if the body contains an expected element, if it does not, then something went wrong while loading the page
 	if !bodyOK && !inStock && !inStockCartButton {
 		err = fmt.Errorf("Body failed to properly load for some reason...")
-		/*
-			bytes, err2 := ioutil.ReadAll(bodyCopy)
-			if err2 != nil {
-				err = fmt.Errorf(err.Error()+":"+"failed to read body (%v)", err2)
-				return false, false, false, nil, err
-			}
-
-			err2 = helperfuncs.SaveBodyToHTML(bytes)
-			if err2 != nil {
-				err = fmt.Errorf("%v (%v)", err, err2)
-				return false, false, false, nil, err
-			}*/
 
 		return false, false, false, nil, err
 	}
@@ -255,6 +243,19 @@ func LogInSelenium(username, password string, webdriver selenium.WebDriver, sign
 func (shop *Webshop) SolveCaptcha(webdriver selenium.WebDriver, captchaToken string) error {
 
 	//solve captchaaaa
+	captchaTextBox, err := webdriver.FindElement(selenium.ByID, "#captchacharacters")
+	if err != nil {
+		return fmt.Errorf("Failed to find captcha text box element (%v)", err)
+	}
+
+	captchaTextBox.SendKeys(captchaToken)
+
+	continueButton, err := webdriver.FindElement(selenium.ByClassName, "#a-button-text")
+	if err != nil {
+		return fmt.Errorf("Failed to find continue button element (%v)", err)
+	}
+
+	continueButton.Click()
 
 	return nil
 }

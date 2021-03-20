@@ -117,11 +117,18 @@ func (handler *StockAlertHandler) stockChecker(wgSeleniumExit *sync.WaitGroup, c
 					captchaToken, err := captchasolver.SolveCaptcha(captchaData.CaptchaURL, globalConfig.CaptchaSolverEndpoint)
 					if err != nil {
 						helperfuncs.Log(handler.addMetrics("Failed to solve captcha (%v)", taskID), err)
-
+						wgSeleniumExit.Done()
+						return
 					} else {
 						helperfuncs.Log(handler.addMetrics("Captcha solved: %s", taskID), captchaToken)
 					}
 
+					err = seleniumSession.SolveCaptcha(captchaToken, webshop)
+					if err != nil {
+						helperfuncs.Log(handler.addMetrics("Failed to complete captcha (%v)", taskID), err)
+						wgSeleniumExit.Done()
+						return
+					}
 					/*
 						//open chrome to localhost:3077/api/captchasolver/[session_id]
 						helperfuncs.CreateSessionHTML(captchaData.SessionID, captchaData.CaptchaURL)
