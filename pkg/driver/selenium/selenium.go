@@ -207,7 +207,7 @@ func (handler *SeleniumHandler) Checkout(useAddToCartButton bool, webshop websho
 		return fmt.Errorf("No free sessions available to checkout product %s", product.Name)
 	}
 
-	err := webshop.Checkout(useAddToCartButton, product, session.webdriver)
+	err := webshop.CheckoutSidebar(useAddToCartButton, product, session.webdriver)
 	if err != nil {
 		return fmt.Errorf("Failed to checkout product %s (%v)", product.Name, err)
 	}

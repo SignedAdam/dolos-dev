@@ -108,7 +108,7 @@ func (shop *Webshop) Checkout(useAddToCartButton bool, product structs.ProductUR
 
 	price, err := strconv.ParseFloat(priceString, 32)
 	if err != nil {
-		return fmt.Errorf("Failed to parce price %s (%v)", priceString, err)
+		return fmt.Errorf("Failed to parse price %s (%v)", priceString, err)
 	}
 
 	if int(price) > product.MaxPrice || int(price) < product.MinPrice {
@@ -162,6 +162,88 @@ func (shop *Webshop) Checkout(useAddToCartButton bool, product structs.ProductUR
 		return fmt.Errorf("Could not find place order button element (%v)", err)
 	}
 
+	elemPlaceOrder.Click()
+
+	return nil
+}
+
+func (shop *Webshop) CheckoutSidebar(useAddToCartButton bool, product structs.ProductURL, webdriver selenium.WebDriver) error {
+
+	fmt.Println("Attempting to checkout product ", product.Name)
+	if err := webdriver.Get(product.URL + "/ref=olp-opf-redir?aod=1&ie=UTF8&condition=all"); err != nil {
+		return err
+	}
+	/*
+		pinnedOffer, err := webdriver.FindElement(selenium.ByID, "aod-pinned-offer")
+		if err == nil {
+			inStockSidebarPinned, cartButton, _ := checkOffer(webdriver, product, pinnedOffer)
+			if inStockSidebarPinned {
+
+				err := checkout(webdriver, product, *cartButton)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	*/
+	//get offer list
+	offerList, err := webdriver.FindElement(selenium.ByID, "aod-offer-list")
+	if err != nil {
+		return err
+	}
+
+	//loop through div id [aod-offer] elements
+	offers, err := offerList.FindElements(selenium.ByID, "aod-offer")
+	if err != nil {
+		return err
+	}
+
+	var offerError error
+	for _, offer := range offers {
+
+		inStock, addToCartButton, err := checkOffer(webdriver, product, offer)
+		if err != nil {
+			offerError = err
+			continue
+		}
+		if inStock {
+			err = checkout(webdriver, product, *addToCartButton)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	if offerError != nil {
+		return offerError
+	}
+
+	return nil
+}
+
+func checkout(webdriver selenium.WebDriver, product structs.ProductURL, addToCartButton selenium.WebElement) error {
+	var errContinueBtn error = nil
+	//click add to cart
+	err := addToCartButton.Click()
+	if err != nil {
+		return fmt.Errorf("Failed to click add to cart  button for product %s (%v)", product.Name, err)
+	}
+
+	//url to go directly to checkout
+	webdriver.Get(fmt.Sprint("https://www.amazon", getCountryCode(product.URL), "/-/en/gp/cart/view.html/ref=lh_co?ie=UTF8&proceedToCheckout.x=129&cartInitiateId=1616029244603&hasWorkingJavascript=1"))
+
+	//wait ?
+
+	elemPlaceOrder, err := webdriver.FindElement(selenium.ByName, "placeYourOrder1")
+	if err != nil {
+		if errContinueBtn != nil {
+			return fmt.Errorf("Could not find continue OR place order button element (%v)", errContinueBtn)
+		}
+
+		return fmt.Errorf("Could not find place order button element (%v)", err)
+	}
+
+	return nil
 	elemPlaceOrder.Click()
 
 	return nil
@@ -261,7 +343,7 @@ func (shop *Webshop) SolveCaptcha(webdriver selenium.WebDriver, captchaToken str
 }
 
 func (shop *Webshop) CheckStockStatusSelenium(webdriver selenium.WebDriver, productURL structs.ProductURL) (bool, bool, bool, string, error) {
-	err := webdriver.Get(productURL.URL)
+	err := webdriver.Get(productURL.URL + "/ref=olp-opf-redir?aod=1&ie=UTF8&condition=all")
 	if err != nil {
 		return false, false, false, "", err
 	}
@@ -291,6 +373,7 @@ func (shop *Webshop) CheckStockStatusSelenium(webdriver selenium.WebDriver, prod
 		return false, false, false, "", err
 	}
 
+	/* //we only check sidebar, not the main page
 	_, err = webdriver.FindElement(selenium.ByID, "buy-now-button")
 	if err == nil {
 		return true, false, false, "", nil
@@ -300,16 +383,91 @@ func (shop *Webshop) CheckStockStatusSelenium(webdriver selenium.WebDriver, prod
 	if err == nil {
 		return true, true, false, "", nil
 	}
+	*/
+
+	inStockCart, err := shop.CheckStockSidebar(webdriver, productURL)
+
+	//we return the same var twice here since if its in stock in the side bar, it will always be as add-to-cart
+	return inStockCart, inStockCart, false, "", err
+}
+
+func checkOffer(webdriver selenium.WebDriver, productURL structs.ProductURL, parentElement selenium.WebElement) (bool, *selenium.WebElement, error) {
+	fmt.Println(parentElement.Text())
+
+	pinnedOfferPrice, err := parentElement.FindElement(selenium.ByCSSSelector, ".a-price-whole")
+	if err != nil {
+		return false, nil, err
+	}
+
+	fmt.Println(pinnedOfferPrice.Text())
+
+	//make sure price is within parameters
+	priceString, err := pinnedOfferPrice.Text()
+	if err != nil {
+		return false, nil, err
+	}
 	/*
-		if a.Val == "buy-now-button" {
-			return bodyOK, true, false, false, ""
+		priceString = strings.ReplaceAll(priceString, "$", "")
+		priceString = strings.ReplaceAll(priceString, "€", "")
+	*/
+	price, err := strconv.ParseFloat(priceString, 32)
+	if err != nil {
+		return false, nil, err
+	}
+
+	if int(price) > productURL.MaxPrice || int(price) < productURL.MinPrice {
+		return false, nil, err
+	}
+
+	addToCartButton, err := parentElement.FindElement(selenium.ByName, "submit.addToCart")
+	if err != nil {
+		return false, nil, err
+	}
+
+	return true, &addToCartButton, nil
+}
+
+func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL structs.ProductURL) (bool, error) {
+
+	pinnedOffer, err := webdriver.FindElement(selenium.ByID, "aod-pinned-offer")
+	if err == nil {
+		inStockSidebarPinned, _, _ := checkOffer(webdriver, productURL, pinnedOffer)
+		if inStockSidebarPinned {
+			return true, nil
+		}
+	}
+
+	//find div element containing all products
+	//div id aod-offer-list
+	offerList, err := webdriver.FindElement(selenium.ByID, "aod-offer-list")
+	if err != nil {
+		return false, fmt.Errorf("Could not find sidebar offer list (%v)", err)
+	}
+
+	//loop through div id [aod-offer] elements
+	offers, err := offerList.FindElements(selenium.ByID, "aod-offer")
+	if err != nil {
+		return false, err
+	}
+
+	var offerError error
+	for _, offer := range offers {
+
+		inStock, _, err := checkOffer(webdriver, productURL, offer)
+		if inStock {
+			return true, nil
 		}
 
-		if a.Val == "add-to-cart-button" {
-			return bodyOK, true, true, false, ""
+		if err != nil {
+			offerError = err
 		}
-	*/
-	return false, false, false, "", nil
+	}
+
+	if offerError != nil {
+		return false, err
+	}
+
+	return false, nil
 }
 
 func checkStockStatus(body io.ReadCloser) (bool, bool, bool, bool, string) {

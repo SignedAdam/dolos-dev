@@ -86,11 +86,11 @@ func main() {
 	for _, product := range handler.ProductURLs {
 		for i := 0; i < product.Threads; i++ {
 			ij++
-			time.Sleep(5000 * time.Millisecond)
 			handler.mutex.Lock()
 			go handler.stockChecker(&wgSeleniumExit, ctx, *product, *handler.GlobalConfig, ij)
 			handler.mutex.Unlock()
 			wgSeleniumExit.Add(1)
+			time.Sleep(5000 * time.Millisecond)
 		}
 	}
 

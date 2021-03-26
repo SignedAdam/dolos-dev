@@ -14,4 +14,5 @@ type Webshop interface {
 	GetKind() structs.Webshop
 	//LogInSelenium(string, string, selenium.WebDriver) error
 	Checkout(bool, structs.ProductURL, selenium.WebDriver) error
+	CheckoutSidebar(bool, structs.ProductURL, selenium.WebDriver) error
 }
