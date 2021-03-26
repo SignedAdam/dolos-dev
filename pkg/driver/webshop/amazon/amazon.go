@@ -243,7 +243,6 @@ func checkout(webdriver selenium.WebDriver, product structs.ProductURL, addToCar
 		return fmt.Errorf("Could not find place order button element (%v)", err)
 	}
 
-	return nil
 	elemPlaceOrder.Click()
 
 	return nil
