@@ -99,75 +99,42 @@ func (handler *StockAlertHandler) stockChecker(wgSeleniumExit *sync.WaitGroup, c
 			wgSeleniumExit.Done()
 			return
 		default:
-
-			//status, useAddToCartButton, captcha, captchaData, err := webshop.CheckStockStatus(productURL, proxyCopies)
-			status, useAddToCartButton, captcha, captchaData, err := seleniumSession.CheckStockStatus(productURL, webshop)
+			inStock, useAddToCartButton, captcha, captchaData, err := seleniumSession.CheckStockStatus(productURL, webshop)
 			if err != nil {
 				helperfuncs.Log(handler.addMetrics("Failed to check stock for %s [URL: %s] (%v)", taskID), productURL.Name, productURL.URL, err)
-			}
+			} else {
+				if captcha {
+					helperfuncs.Log(handler.addMetrics("Captcha found", taskID))
 
-			if captcha {
-				helperfuncs.Log(handler.addMetrics("Captcha found", taskID))
+					if captchaData.CaptchaURL == "" {
+						helperfuncs.Log(handler.addMetrics("Captcha does not have a URL", taskID))
 
-				if captchaData.CaptchaURL == "" {
-					helperfuncs.Log(handler.addMetrics("Captcha does not have a URL", taskID))
-
-				} else {
-					//put session key and captcha data into CaptchaSolverMap
-					handler.mutex.Lock()
-					handler.CaptchaSolver[captchaData.SessionID] = captchaData
-					handler.metrics.captchaSeen++
-					handler.mutex.Unlock()
-
-					captchaToken, err := captchasolver.SolveCaptcha(captchaData.CaptchaURL, globalConfig.CaptchaSolverEndpoint)
-					if err != nil {
-						helperfuncs.Log(handler.addMetrics("Failed to solve captcha (%v)", taskID), err)
-						wgSeleniumExit.Done()
-						return
 					} else {
-						helperfuncs.Log(handler.addMetrics("Captcha solved: %s", taskID), captchaToken)
-					}
+						//put session key and captcha data into CaptchaSolverMap
+						handler.mutex.Lock()
+						handler.CaptchaSolver[captchaData.SessionID] = captchaData
+						handler.metrics.captchaSeen++
+						handler.mutex.Unlock()
 
-					err = seleniumSession.SolveCaptcha(captchaToken, webshop)
-					if err != nil {
-						helperfuncs.Log(handler.addMetrics("Failed to complete captcha (%v)", taskID), err)
-						wgSeleniumExit.Done()
-						return
-					}
-					/*
-						//open chrome to localhost:3077/api/captchasolver/[session_id]
-						helperfuncs.CreateSessionHTML(captchaData.SessionID, captchaData.CaptchaURL)
-						path := fmt.Sprintf("captchatemplates/%s.html", captchaData.SessionID)
-
-						err = helperfuncs.OpenInBrowser(path) //captchaData.SessionID
+						captchaToken, err := captchasolver.SolveCaptcha(captchaData.CaptchaURL, globalConfig.CaptchaSolverEndpoint)
 						if err != nil {
-							helperfuncs.Log("Failed to open browser (%v)", err)
+							helperfuncs.Log(handler.addMetrics("Failed to solve captcha (%v)", taskID), err)
+							wgSeleniumExit.Done()
+							return
+						} else {
+							helperfuncs.Log(handler.addMetrics("Captcha solved: %s", taskID), captchaToken)
+						}
+
+						err = seleniumSession.SolveCaptcha(captchaToken, webshop)
+						if err != nil {
+							helperfuncs.Log(handler.addMetrics("Failed to complete captcha (%v)", taskID), err)
+							wgSeleniumExit.Done()
 							return
 						}
-
-						//wait for captcha to be solved
-						helperfuncs.Log("Waiting for captcha solve...")
-						for {
-							handler.mutex.RLock()
-							solved := handler.CaptchaSolver[captchaData.SessionID].Solved
-							handler.mutex.RUnlock()
-							if solved {
-								helperfuncs.Log("Captcha solved. Continuing...")
-								handler.mutex.Lock()
-								delete(handler.CaptchaSolver, captchaData.SessionID)
-
-								handler.mutex.Unlock()
-								break
-							}
-							time.Sleep(100 * time.Millisecond)
-						}
-
-						_ = captchaData
-					*/
+					}
 				}
 
-			} else {
-				if status {
+				if inStock {
 					helperfuncs.Log(handler.addMetrics(fmt.Sprint("Product ", productURL.Name, " is in stock!!!!!"), taskID))
 
 					if !productURL.OnlyCheckStock {
@@ -215,31 +182,31 @@ func (handler *StockAlertHandler) stockChecker(wgSeleniumExit *sync.WaitGroup, c
 				} else {
 					helperfuncs.Log(handler.addMetrics(fmt.Sprint("Product ", productURL.Name, " sold out"), taskID))
 				}
+			}
 
-				if useProxies {
-					//check if proxies needs to be updated
-					if lastProxySet.Add(time.Duration(globalProxyLifetime)*time.Minute).Before(time.Now()) && proxyLifecycle {
-						helperfuncs.Log(handler.addMetrics("\n==================================================\nchanging proxies\n", taskID))
-						handler.mutex.Lock()
-						proxies, err = helperfuncs.FindNextProxy(productURL.ProxiesCount, proxies, handler.Proxies, webshopKind, globalProxyLifetime)
-						for _, proxy := range proxies {
-							proxyCopies = append(proxyCopies, *proxy)
-						}
-						handler.mutex.Unlock()
-						if err != nil {
-							helperfuncs.Log(handler.addMetrics("Failed to get next proxies for %s [URL: %s] (%v)", taskID), productURL.Name, productURL.URL, err)
-							wgSeleniumExit.Done()
-							return
-						}
-						helperfuncs.Log(handler.addMetrics("proxies changed\n==================================================\n", taskID))
-
-						handler.mutex.Lock()
-						seleniumSession.Webdriver.Quit()
-						seleniumSession, err = handler.seleniumHandler.NewSession(&proxyCopies)
-						handler.mutex.Unlock()
-
-						lastProxySet = time.Now()
+			if useProxies {
+				//check if proxies needs to be updated
+				if lastProxySet.Add(time.Duration(globalProxyLifetime)*time.Minute).Before(time.Now()) && proxyLifecycle {
+					helperfuncs.Log(handler.addMetrics("\n==================================================\nchanging proxies\n", taskID))
+					handler.mutex.Lock()
+					proxies, err = helperfuncs.FindNextProxy(productURL.ProxiesCount, proxies, handler.Proxies, webshopKind, globalProxyLifetime)
+					for _, proxy := range proxies {
+						proxyCopies = append(proxyCopies, *proxy)
 					}
+					handler.mutex.Unlock()
+					if err != nil {
+						helperfuncs.Log(handler.addMetrics("Failed to get next proxies for %s [URL: %s] (%v)", taskID), productURL.Name, productURL.URL, err)
+						wgSeleniumExit.Done()
+						return
+					}
+					helperfuncs.Log(handler.addMetrics("proxies changed\n==================================================\n", taskID))
+
+					handler.mutex.Lock()
+					seleniumSession.Webdriver.Quit()
+					seleniumSession, err = handler.seleniumHandler.NewSession(&proxyCopies)
+					handler.mutex.Unlock()
+
+					lastProxySet = time.Now()
 				}
 			}
 

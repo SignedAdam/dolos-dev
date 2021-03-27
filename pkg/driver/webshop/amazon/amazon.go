@@ -454,7 +454,7 @@ func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL 
 		//}
 	}, 10*time.Millisecond, 5*time.Second)
 	if err != nil {
-		return false, fmt.Errorf("timeout or what? (%v)", err)
+		return false, fmt.Errorf("timed out looking for aod-pinned-offer element (%v)", err)
 	}
 
 	pinnedOffer, err := webdriver.FindElement(selenium.ByID, "aod-pinned-offer")
