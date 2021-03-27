@@ -226,6 +226,184 @@ func (shop *Webshop) CheckoutSidebar(useAddToCartButton bool, product structs.Pr
 	return nil
 }
 
+func (shop *Webshop) CheckStockStatusSelenium(webdriver selenium.WebDriver, productURL structs.ProductURL) (bool, bool, bool, string, error) {
+	err := webdriver.Get(productURL.URL + "/ref=olp-opf-redir?aod=1&ie=UTF8&condition=all")
+	if err != nil {
+		return false, false, false, "", err
+	}
+
+	_, err = webdriver.FindElement(selenium.ByCSSSelector, "#productTitle")
+	if err != nil {
+		//couldn't find product title. Maybe captcha?
+		images, err := webdriver.FindElements(selenium.ByTagName, "#img")
+		if err != nil {
+			err = fmt.Errorf("Page not correctly loaded (%v)", err)
+			return false, false, false, "", err
+		}
+		for _, img := range images {
+			imgSrc, err := img.GetAttribute("src")
+			if err != nil {
+				err = fmt.Errorf("img has no src attribute (%v)", err)
+
+			} else {
+				if strings.Contains(imgSrc, "captcha") {
+					return false, false, true, imgSrc, err
+				}
+
+			}
+		}
+		screenshot, err := webdriver.Screenshot()
+		if err != nil {
+			fmt.Println("Failed to save screenshot")
+		}
+
+		imagePath, err := helperfuncs.SaveImage(productURL.Name, screenshot)
+		err = fmt.Errorf("Page not correctly loaded or something. Screenshot saved under %s (%v)", imagePath, err)
+
+		return false, false, false, "", err
+	}
+
+	/* //we only check sidebar, not the main page
+	_, err = webdriver.FindElement(selenium.ByID, "buy-now-button")
+	if err == nil {
+		return true, false, false, "", nil
+	}
+
+	_, err = webdriver.FindElement(selenium.ByID, "add-to-cart-button")
+	if err == nil {
+		return true, true, false, "", nil
+	}
+	*/
+
+	inStockCart, err := shop.CheckStockSidebar(webdriver, productURL)
+
+	//we return the same var twice here since if its in stock in the side bar, it will always be as add-to-cart
+	return inStockCart, inStockCart, false, "", err
+}
+
+func checkOffer(webdriver selenium.WebDriver, productURL structs.ProductURL, parentElement selenium.WebElement) (bool, *selenium.WebElement, error) {
+	pinnedOfferPrice, err := parentElement.FindElement(selenium.ByCSSSelector, ".a-price-whole")
+	if err != nil {
+		return false, nil, err
+	}
+
+	//make sure price is within parameters
+	priceString, err := pinnedOfferPrice.Text()
+	if err != nil {
+		return false, nil, err
+	}
+	/*
+		priceString = strings.ReplaceAll(priceString, "$", "")
+		priceString = strings.ReplaceAll(priceString, "€", "")
+	*/
+	price, err := strconv.ParseFloat(priceString, 32)
+	if err != nil {
+		return false, nil, err
+	}
+
+	if int(price) > productURL.MaxPrice || int(price) < productURL.MinPrice {
+		return false, nil, err
+	}
+
+	addToCartButton, err := parentElement.FindElement(selenium.ByName, "submit.addToCart")
+	if err != nil {
+		return false, nil, err
+	}
+
+	return true, &addToCartButton, nil
+}
+
+func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL structs.ProductURL) (bool, error) {
+
+	err := webdriver.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		//for {
+		pinnedOffer, err := webdriver.FindElement(selenium.ByID, "all-offers-display-scroller")
+		if err != nil {
+			return false, nil //fmt.Errorf("Could not find password element (%v)", err)
+		}
+		if pinnedOffer != nil {
+			return true, nil
+		}
+		return false, nil
+		//}
+	}, 5*time.Second, 10*time.Millisecond)
+	if err != nil {
+		screenshot, err := webdriver.Screenshot()
+		if err != nil {
+			fmt.Println("Failed to save screenshot")
+		}
+
+		imagePath, err := helperfuncs.SaveImage(productURL.Name, screenshot)
+		return false, fmt.Errorf("timed out looking for all-offers-display-scroller element. Screenshot saved under %s (%v)", imagePath, err)
+	}
+
+	err = webdriver.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		//for {
+		pinnedOffer, err := webdriver.FindElement(selenium.ByID, "aod-pinned-offer")
+		if err != nil {
+			return false, nil //fmt.Errorf("Could not find password element (%v)", err)
+		}
+		if pinnedOffer != nil {
+			return true, nil
+		}
+		return false, nil
+		//}
+	}, 5*time.Second, 10*time.Millisecond)
+	if err != nil {
+		screenshot, err := webdriver.Screenshot()
+		if err != nil {
+			fmt.Println("Failed to save screenshot")
+		}
+
+		imagePath, err := helperfuncs.SaveImage(productURL.Name, screenshot)
+		return false, fmt.Errorf("timed out looking for aod-pinned-offer element. Screenshot saved under %s (%v)", imagePath, err)
+	}
+
+	pinnedOffer, err := webdriver.FindElement(selenium.ByID, "aod-pinned-offer")
+	if err == nil {
+		inStockSidebarPinned, _, _ := checkOffer(webdriver, productURL, pinnedOffer)
+		if inStockSidebarPinned {
+			return true, nil
+		}
+	}
+
+	//find div element containing all products
+	//div id aod-offer-list
+	offerList, err := webdriver.FindElement(selenium.ByID, "aod-offer-list")
+	if err != nil {
+		return false, fmt.Errorf("Could not find sidebar offer list (%v)", err)
+	}
+
+	//loop through div id [aod-offer] elements
+	offers, err := offerList.FindElements(selenium.ByID, "aod-offer")
+	if err != nil {
+		return false, err
+	}
+
+	if len(offers) == 0 {
+		return false, nil
+	}
+
+	var offerError error
+	for _, offer := range offers {
+
+		inStock, _, err := checkOffer(webdriver, productURL, offer)
+		if inStock {
+			return true, nil
+		}
+
+		if err != nil {
+			offerError = err
+		}
+	}
+
+	if offerError != nil {
+		return false, err
+	}
+
+	return false, nil
+}
+
 func checkout(webdriver selenium.WebDriver, product structs.ProductURL, addToCartButton selenium.WebElement) error {
 	var errContinueBtn error = nil
 	//click add to cart
@@ -356,156 +534,6 @@ func (shop *Webshop) SolveCaptcha(webdriver selenium.WebDriver, captchaToken str
 	continueButton.Click()
 
 	return nil
-}
-
-func (shop *Webshop) CheckStockStatusSelenium(webdriver selenium.WebDriver, productURL structs.ProductURL) (bool, bool, bool, string, error) {
-	err := webdriver.Get(productURL.URL + "/ref=olp-opf-redir?aod=1&ie=UTF8&condition=all")
-	if err != nil {
-		return false, false, false, "", err
-	}
-
-	_, err = webdriver.FindElement(selenium.ByCSSSelector, "#productTitle")
-	if err != nil {
-		//couldn't find product title. Maybe captcha?
-		images, err := webdriver.FindElements(selenium.ByTagName, "#img")
-		if err != nil {
-			err = fmt.Errorf("Page not correctly loaded (%v)", err)
-			return false, false, false, "", err
-		}
-		for _, img := range images {
-			imgSrc, err := img.GetAttribute("src")
-			if err != nil {
-				err = fmt.Errorf("img has no src attribute (%v)", err)
-
-			} else {
-				if strings.Contains(imgSrc, "captcha") {
-					return false, false, true, imgSrc, err
-				}
-
-			}
-		}
-		err = fmt.Errorf("Page not correctly loaded or something. Please check!")
-		currentWindowHandle, err := webdriver.CurrentWindowHandle()
-		if err != nil {
-			return false, false, false, "", fmt.Errorf("SOMETHING HAS GONE TERRIBLY WRONG")
-		}
-		webdriver.SwitchWindow(currentWindowHandle)
-		time.Sleep(30 * time.Second)
-
-		return false, false, false, "", err
-	}
-
-	/* //we only check sidebar, not the main page
-	_, err = webdriver.FindElement(selenium.ByID, "buy-now-button")
-	if err == nil {
-		return true, false, false, "", nil
-	}
-
-	_, err = webdriver.FindElement(selenium.ByID, "add-to-cart-button")
-	if err == nil {
-		return true, true, false, "", nil
-	}
-	*/
-
-	inStockCart, err := shop.CheckStockSidebar(webdriver, productURL)
-
-	//we return the same var twice here since if its in stock in the side bar, it will always be as add-to-cart
-	return inStockCart, inStockCart, false, "", err
-}
-
-func checkOffer(webdriver selenium.WebDriver, productURL structs.ProductURL, parentElement selenium.WebElement) (bool, *selenium.WebElement, error) {
-	pinnedOfferPrice, err := parentElement.FindElement(selenium.ByCSSSelector, ".a-price-whole")
-	if err != nil {
-		return false, nil, err
-	}
-
-	//make sure price is within parameters
-	priceString, err := pinnedOfferPrice.Text()
-	if err != nil {
-		return false, nil, err
-	}
-	/*
-		priceString = strings.ReplaceAll(priceString, "$", "")
-		priceString = strings.ReplaceAll(priceString, "€", "")
-	*/
-	price, err := strconv.ParseFloat(priceString, 32)
-	if err != nil {
-		return false, nil, err
-	}
-
-	if int(price) > productURL.MaxPrice || int(price) < productURL.MinPrice {
-		return false, nil, err
-	}
-
-	addToCartButton, err := parentElement.FindElement(selenium.ByName, "submit.addToCart")
-	if err != nil {
-		return false, nil, err
-	}
-
-	return true, &addToCartButton, nil
-}
-
-func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL structs.ProductURL) (bool, error) {
-
-	err := webdriver.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
-		//for {
-		pinnedOffer, err := webdriver.FindElement(selenium.ByID, "aod-pinned-offer")
-		if err != nil {
-			return false, nil //fmt.Errorf("Could not find password element (%v)", err)
-		}
-		if pinnedOffer != nil {
-			return true, nil
-		}
-		return false, nil
-		//}
-	}, 5*time.Second, 10*time.Millisecond)
-	if err != nil {
-		return false, fmt.Errorf("timed out looking for aod-pinned-offer element (%v)", err)
-	}
-
-	pinnedOffer, err := webdriver.FindElement(selenium.ByID, "aod-pinned-offer")
-	if err == nil {
-		inStockSidebarPinned, _, _ := checkOffer(webdriver, productURL, pinnedOffer)
-		if inStockSidebarPinned {
-			return true, nil
-		}
-	}
-
-	//find div element containing all products
-	//div id aod-offer-list
-	offerList, err := webdriver.FindElement(selenium.ByID, "aod-offer-list")
-	if err != nil {
-		return false, fmt.Errorf("Could not find sidebar offer list (%v)", err)
-	}
-
-	//loop through div id [aod-offer] elements
-	offers, err := offerList.FindElements(selenium.ByID, "aod-offer")
-	if err != nil {
-		return false, err
-	}
-
-	if len(offers) == 0 {
-		return false, nil
-	}
-
-	var offerError error
-	for _, offer := range offers {
-
-		inStock, _, err := checkOffer(webdriver, productURL, offer)
-		if inStock {
-			return true, nil
-		}
-
-		if err != nil {
-			offerError = err
-		}
-	}
-
-	if offerError != nil {
-		return false, err
-	}
-
-	return false, nil
 }
 
 func checkStockStatus(body io.ReadCloser) (bool, bool, bool, bool, string) {
