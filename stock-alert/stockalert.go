@@ -47,14 +47,17 @@ func main() {
 		CaptchaSolver: make(map[string]*structs.CaptchaWrapper),
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctxStockChecker, stockCheckerCancel := context.WithCancel(context.Background())
+	ctxCheckout, checkoutCancel := context.WithCancel(context.Background())
 	go func() {
 		<-sigStopServerSignal
 		log.Println("Stopping server...")
-		cancel()
+		time.Sleep(10 * time.Second)
+		stockCheckerCancel()
 		//wait for all selenium stock checker processes to be terminated
 		wgSeleniumExit.Wait()
 		fmt.Println("Exiting all checkout processes")
+		checkoutCancel()
 		handler.mutex.Lock()
 		handler.seleniumHandler.CloseAll()
 		fmt.Println("Closed all selenium checkout related processes")
@@ -77,7 +80,7 @@ func main() {
 	handler.seleniumHandler = seleniumHandler
 
 	//TODO username and pass from globalconfig
-	err = seleniumHandler.CreateCheckoutSessions(handler.GlobalConfig.CheckoutInstancesPerWebshop, ctx, *handler.GlobalConfig, handler.ProductURLs)
+	err = seleniumHandler.CreateCheckoutSessions(handler.GlobalConfig.CheckoutInstancesPerWebshop, ctxCheckout, *handler.GlobalConfig, handler.ProductURLs)
 	if err != nil {
 		helperfuncs.Log("Failed to start selenium browser instances (%v)", err)
 	}
@@ -87,7 +90,7 @@ func main() {
 		for i := 0; i < product.Threads; i++ {
 			ij++
 			handler.mutex.Lock()
-			go handler.stockChecker(&wgSeleniumExit, ctx, *product, *handler.GlobalConfig, ij)
+			go handler.stockChecker(&wgSeleniumExit, ctxStockChecker, *product, *handler.GlobalConfig, ij)
 			handler.mutex.Unlock()
 			wgSeleniumExit.Add(1)
 			time.Sleep(5000 * time.Millisecond)

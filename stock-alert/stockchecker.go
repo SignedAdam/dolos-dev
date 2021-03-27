@@ -92,13 +92,20 @@ func (handler *StockAlertHandler) stockChecker(wgSeleniumExit *sync.WaitGroup, c
 		case <-ctx.Done():
 			//if the sigStopChan channel is signalled then we return from the function to kill the thread
 			helperfuncs.Log(handler.addMetrics("Exiting stockChecker thread", taskID))
+			/*
+				err = seleniumSession.Webdriver.Close()
+				if err != nil {
+					fmt.Println("failed to close selenium session ", err)
+				}
+			*/
 			err = seleniumSession.Webdriver.Quit()
 			if err != nil {
-				fmt.Println(err)
+				fmt.Println("failed to quit selenium session ", err)
 			}
 			wgSeleniumExit.Done()
 			return
 		default:
+			checkStartTime := time.Now()
 			inStock, useAddToCartButton, captcha, captchaData, err := seleniumSession.CheckStockStatus(productURL, webshop)
 			if err != nil {
 				helperfuncs.Log(handler.addMetrics("Failed to check stock for %s [URL: %s] (%v)", taskID), productURL.Name, productURL.URL, err)
@@ -210,7 +217,12 @@ func (handler *StockAlertHandler) stockChecker(wgSeleniumExit *sync.WaitGroup, c
 				}
 			}
 
-			time.Sleep(time.Duration(stockCheckInterval+rand.Intn(globalConfig.AmazonStockCheckIntervalDeviation)) * time.Millisecond)
+			timeElapsed := time.Now().Sub(checkStartTime)
+			if timeElapsed.Milliseconds() < int64(stockCheckInterval) {
+				sleepTime := (stockCheckInterval + rand.Intn(globalConfig.AmazonStockCheckIntervalDeviation)) - int(timeElapsed.Milliseconds())
+				time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+			}
+
 		}
 	}
 }

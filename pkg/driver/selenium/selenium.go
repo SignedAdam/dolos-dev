@@ -158,9 +158,15 @@ func createSingleSession( /*port int,*/ proxies []structs.Proxy) (selenium.WebDr
 			return nil, err
 		}
 
-		chromeCaps := chrome.Capabilities{}
-		chromeCaps.Args = []string{"user-agent=" + getRandomUserAgent()}
+		chromeCaps := chrome.Capabilities{
+			Path: "",
+			Args: []string{
+				"--blink-settings=imagesEnabled=false", // <<<
+				"--disable-gpu",
+				"--disable-sandbox",
+			}}
 		chromeCaps.AddExtension(pluginPath)
+
 		caps.AddChrome(chromeCaps)
 
 		err = helperfuncs.DeleteFileOrDir(pluginPath)
