@@ -7,6 +7,7 @@ import (
 	"dolos-dev/pkg/helperfuncs"
 	"dolos-dev/pkg/structs"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -86,14 +87,14 @@ func Init() (*SeleniumHandler, error) {
 	return &SeleniumHandler{seleniumService: seleniumSVC}, nil
 }
 
-func (handler *SeleniumHandler) NewSession(proxy *structs.Proxy) (*SingleSession, error) {
+func (handler *SeleniumHandler) NewSession(proxies *[]structs.Proxy) (*SingleSession, error) {
 	/*
 		handler.Lock()
 		handler.lastPort = handler.lastPort + 1
 		port := handler.lastPort
 		handler.Unlock()
 	*/
-	wd, err := createSingleSession( /*port,*/ proxy)
+	wd, err := createSingleSession( /*port,*/ *proxies)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +127,7 @@ func (handler *SeleniumHandler) createSession(wg *sync.WaitGroup, id int, websho
 	handler.Unlock()
 }
 
-func createSingleSession( /*port int,*/ proxy *structs.Proxy) (selenium.WebDriver, error) {
+func createSingleSession( /*port int,*/ proxies []structs.Proxy) (selenium.WebDriver, error) {
 	/*var (
 		// These paths will be different on your system.
 		seleniumPath     = "selenium/selenium-server/selenium-server-standalone-3.141.59.jar" //client-combined-3.141.59
@@ -145,18 +146,20 @@ func createSingleSession( /*port int,*/ proxy *structs.Proxy) (selenium.WebDrive
 	}
 	//defer service.Stop()
 	*/
-	caps := selenium.Capabilities{"browserName": "chrome"}
+	caps := selenium.Capabilities{
+		"browserName": "chrome",
+	}
 
 	//add proxy to this instance's capabilities
 	//var pluginPath string
-	if proxy != nil {
-		pluginPath, err := createPluginZip(*proxy)
+	if len(proxies) > 0 {
+		pluginPath, err := createPluginZip(proxies)
 		if err != nil {
 			return nil, err
 		}
 
 		chromeCaps := chrome.Capabilities{}
-
+		chromeCaps.Args = []string{"user-agent=" + getRandomUserAgent()}
 		chromeCaps.AddExtension(pluginPath)
 		caps.AddChrome(chromeCaps)
 
@@ -180,7 +183,25 @@ func (session *SingleSession) SolveCaptcha(captchaToken string, webshop webshop.
 	return err
 }
 
-func (session *SingleSession) CheckStockStatus(productURL structs.ProductURL, proxy structs.Proxy, webshop webshop.Webshop) (bool, bool, bool, *structs.CaptchaWrapper, error) {
+func getRandomUserAgent() string {
+
+	userAgents := [10]string{
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36",
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36",
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36",
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.105 Safari/537.36",
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36",
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36",
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.104 Safari/537.36",
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.132 Safari/537.36",
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.141 Safari/537.36",
+		"Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.88 Safari/537.36",
+	}
+
+	return userAgents[rand.Intn(9)]
+}
+
+func (session *SingleSession) CheckStockStatus(productURL structs.ProductURL, webshop webshop.Webshop) (bool, bool, bool, *structs.CaptchaWrapper, error) {
 
 	inStock, inStockCartButton, captcha, captchaSrc, err := webshop.CheckStockStatusSelenium(session.Webdriver, productURL)
 

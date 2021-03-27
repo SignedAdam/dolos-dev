@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func createPluginZip(proxy structs.Proxy) (string, error) {
+func createPluginZip(proxies []structs.Proxy) (string, error) {
 	sessionID := helperfuncs.GenerateRandomString(7)
 	newZipFile, err := os.Create(fmt.Sprint("selenium/plugin", sessionID, ".zip"))
 	if err != nil {
@@ -27,17 +27,24 @@ func createPluginZip(proxy structs.Proxy) (string, error) {
 	}
 
 	//read the template file
-	readBytes, err := ioutil.ReadFile("selenium/proxy/background_template.js")
+	readBytes, err := ioutil.ReadFile("selenium/proxy/background_templatev2.js")
 	if err != nil {
 		return "", fmt.Errorf("failed to read template HTML file (%v)", err)
 	}
 
+	proxiesConcat := ""
+	for _, proxy := range proxies {
+		proxiesConcat = fmt.Sprintf("%s\"%s\",", proxiesConcat, proxy.IP)
+	}
+
+	proxiesConcat = string(proxiesConcat[:len(proxiesConcat)-1])
+
 	readStr := string(readBytes)
 
-	readStr = strings.Replace(readStr, "{PROXYIP}", proxy.IP, 1)
-	readStr = strings.Replace(readStr, "{PROXYPORT}", proxy.Port, 1)
-	readStr = strings.Replace(readStr, "{PROXYUSER}", proxy.User, 1)
-	readStr = strings.Replace(readStr, "{PROXYPASS}", proxy.Password, 1)
+	readStr = strings.Replace(readStr, "{PROXYIPS}", proxiesConcat, 1)
+	readStr = strings.Replace(readStr, "{PROXYPORT}", proxies[0].Port, 1)
+	readStr = strings.Replace(readStr, "{PROXYUSER}", proxies[0].User, 1)
+	readStr = strings.Replace(readStr, "{PROXYPASS}", proxies[0].Password, 1)
 
 	//write the result into a new file under captchatemplates/[sessionid].html
 	err = ioutil.WriteFile(fmt.Sprintf("selenium/%s/background.js", sessionID), []byte(readStr), 0644)

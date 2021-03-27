@@ -284,7 +284,7 @@ func LogInSelenium(username, password string, webdriver selenium.WebDriver, sign
 		//for {
 		elemPassword, err := webdriver.FindElement(selenium.ByCSSSelector, "#ap_password")
 		if err != nil {
-			return false, fmt.Errorf("Could not find password element (%v)", err)
+			return false, nil
 		}
 		if elemPassword != nil {
 			return true, nil
@@ -325,11 +325,11 @@ func LogInSelenium(username, password string, webdriver selenium.WebDriver, sign
 
 	webdriver.Wait(func(wd selenium.WebDriver) (bool, error) {
 		//for {
-		elemPassword, err := webdriver.FindElement(selenium.ByClassName, "#nav-search-field")
+		elemSearchBox, err := webdriver.FindElement(selenium.ByID, "twotabsearchtextbox")
 		if err != nil {
 			return false, nil
 		}
-		if elemPassword != nil {
+		if elemSearchBox != nil {
 			return true, nil
 		}
 		return false, nil

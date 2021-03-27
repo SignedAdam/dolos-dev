@@ -10,6 +10,7 @@ type ProductURL struct {
 	MinPrice         int `json:"min_price"`
 	MaxPrice         int `json:"max_price"`
 	Threads          int
+	ProxiesCount     int `json:"proxies_count"`
 	MaxPurchases     int `json:"max_purchases"`
 	CurrentPurchases int
 	OnlyCheckStock   bool `json:"only_check_stock"`

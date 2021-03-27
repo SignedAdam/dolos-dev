@@ -71,22 +71,39 @@ type proxyConfig struct {
 }
 
 //FindNextProxy finds the next valid proxy in the given list for the given webshop and returns it
-func FindNextProxy(currentProxy *structs.Proxy, proxies []*structs.Proxy, webshopKind structs.Webshop, proxyLifetime int) (*structs.Proxy, error) {
+func FindNextProxy(amount int, currentProxies []*structs.Proxy, proxies []*structs.Proxy, webshopKind structs.Webshop, proxyLifetime int) ([]*structs.Proxy, error) {
 
-	if currentProxy != nil {
+	//reset current proxies
+	for _, currentProxy := range currentProxies {
 		currentProxy.LastUsedAmazon = time.Now()
 		currentProxy.InUse = false
 	}
 
-	//find next suitable proxy
+	foundProxies := make([]*structs.Proxy, 0)
+	foundCount := 0
+	//find next suitable proxies
 	for _, proxy := range proxies {
 		if !proxy.InUse && getRelevantLastUsedTime(webshopKind, proxy).Add(time.Duration(proxyLifetime)*time.Minute).Before(time.Now()) {
-			proxy.LastUsedAmazon = time.Now()
-			proxy.InUse = true
-			return proxy, nil
+			foundProxies = append(foundProxies, proxy)
+			foundCount++
+			if foundCount >= amount {
+				break
+			}
 		}
 	}
-	return nil, fmt.Errorf("No suitable proxies found")
+
+	if len(foundProxies) < amount {
+		return nil, fmt.Errorf("Not enough suitable proxies found")
+	}
+
+	//mark found proxies as in use
+	for _, foundProxy := range foundProxies {
+		foundProxy.LastUsedAmazon = time.Now()
+		foundProxy.InUse = true
+	}
+
+	return foundProxies, nil
+
 }
 
 func getRelevantLastUsedTime(webshopKind structs.Webshop, proxy *structs.Proxy) time.Time {

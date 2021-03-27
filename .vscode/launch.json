@@ -9,7 +9,7 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${fileDirname}",
+            "program": "${workspaceFolder}/stock-alert",
             "cwd": "C:/Users/Vegeta/go/src/dolos-dev/",
             "env": {
                 "CAPTCHA_HTML_TEMPLATE_PATH": "C:/Users/Vegeta/go/src/dolos-dev/captchasolver.html"

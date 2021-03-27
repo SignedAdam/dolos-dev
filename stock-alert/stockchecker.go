@@ -41,9 +41,9 @@ func (handler *StockAlertHandler) stockChecker(wgSeleniumExit *sync.WaitGroup, c
 		stockCheckInterval  int
 		globalProxyLifetime int
 		useProxies          bool
-		proxyCopy           structs.Proxy = structs.Proxy{}
+		proxyCopies         []structs.Proxy //= structs.Proxy{}
 		lastProxySet        time.Time
-		proxy               *structs.Proxy
+		proxies             []*structs.Proxy
 		proxyLifecycle      bool = false
 	)
 
@@ -59,20 +59,25 @@ func (handler *StockAlertHandler) stockChecker(wgSeleniumExit *sync.WaitGroup, c
 			proxyLifecycle = true
 		}
 		handler.mutex.RLock()
-		//find suitable proxy
-		proxy, err = helperfuncs.FindNextProxy(nil, handler.Proxies, webshopKind, globalProxyLifetime)
+		//find suitable proxies
+		proxies, err = helperfuncs.FindNextProxy(productURL.ProxiesCount, nil, handler.Proxies, webshopKind, globalProxyLifetime)
 		handler.mutex.RUnlock()
 		if err != nil {
-			helperfuncs.Log(handler.addMetrics("Failed to get next proxy for %s [URL: %s] (%v)", taskID), productURL.Name, productURL.URL, err)
+			helperfuncs.Log(handler.addMetrics("Failed to get next proxies for %s [URL: %s] (%v)", taskID), productURL.Name, productURL.URL, err)
 			wgSeleniumExit.Done()
 			return
 		}
-		proxyCopy = *proxy
+		handler.mutex.RLock()
+		for _, proxy := range proxies {
+			proxyCopies = append(proxyCopies, *proxy)
+		}
+		handler.mutex.RUnlock()
+
 		lastProxySet = time.Now()
 	}
 
 	handler.mutex.Lock()
-	seleniumSession, err := handler.seleniumHandler.NewSession(&proxyCopy)
+	seleniumSession, err := handler.seleniumHandler.NewSession(&proxyCopies)
 	handler.mutex.Unlock()
 	if err != nil {
 		helperfuncs.Log(handler.addMetrics("Failed to init selenium instance for this task (%v)", taskID), err)
@@ -95,8 +100,8 @@ func (handler *StockAlertHandler) stockChecker(wgSeleniumExit *sync.WaitGroup, c
 			return
 		default:
 
-			//status, useAddToCartButton, captcha, captchaData, err := webshop.CheckStockStatus(productURL, proxyCopy)
-			status, useAddToCartButton, captcha, captchaData, err := seleniumSession.CheckStockStatus(productURL, proxyCopy, webshop)
+			//status, useAddToCartButton, captcha, captchaData, err := webshop.CheckStockStatus(productURL, proxyCopies)
+			status, useAddToCartButton, captcha, captchaData, err := seleniumSession.CheckStockStatus(productURL, webshop)
 			if err != nil {
 				helperfuncs.Log(handler.addMetrics("Failed to check stock for %s [URL: %s] (%v)", taskID), productURL.Name, productURL.URL, err)
 			}
@@ -212,23 +217,25 @@ func (handler *StockAlertHandler) stockChecker(wgSeleniumExit *sync.WaitGroup, c
 				}
 
 				if useProxies {
-					//check if proxy needs to be updated
+					//check if proxies needs to be updated
 					if lastProxySet.Add(time.Duration(globalProxyLifetime)*time.Minute).Before(time.Now()) && proxyLifecycle {
-						helperfuncs.Log(handler.addMetrics("\n==================================================\nchanging proxies from: "+proxyCopy.IP, taskID))
+						helperfuncs.Log(handler.addMetrics("\n==================================================\nchanging proxies\n", taskID))
 						handler.mutex.Lock()
-						proxy, err = helperfuncs.FindNextProxy(proxy, handler.Proxies, webshopKind, globalProxyLifetime)
-						proxyCopy = *proxy
+						proxies, err = helperfuncs.FindNextProxy(productURL.ProxiesCount, proxies, handler.Proxies, webshopKind, globalProxyLifetime)
+						for _, proxy := range proxies {
+							proxyCopies = append(proxyCopies, *proxy)
+						}
 						handler.mutex.Unlock()
 						if err != nil {
-							helperfuncs.Log(handler.addMetrics("Failed to get next proxy for %s [URL: %s] (%v)", taskID), productURL.Name, productURL.URL, err)
+							helperfuncs.Log(handler.addMetrics("Failed to get next proxies for %s [URL: %s] (%v)", taskID), productURL.Name, productURL.URL, err)
 							wgSeleniumExit.Done()
 							return
 						}
-						helperfuncs.Log(handler.addMetrics(" to "+proxyCopy.IP+"\n==================================================\n", taskID))
+						helperfuncs.Log(handler.addMetrics("proxies changed\n==================================================\n", taskID))
 
 						handler.mutex.Lock()
 						seleniumSession.Webdriver.Quit()
-						seleniumSession, err = handler.seleniumHandler.NewSession(&proxyCopy)
+						seleniumSession, err = handler.seleniumHandler.NewSession(&proxyCopies)
 						handler.mutex.Unlock()
 
 						lastProxySet = time.Now()
