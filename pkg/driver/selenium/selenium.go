@@ -207,9 +207,9 @@ func getRandomUserAgent() string {
 	return userAgents[rand.Intn(9)]
 }
 
-func (session *SingleSession) CheckStockStatus(productURL structs.ProductURL, webshop webshop.Webshop) (bool, bool, bool, *structs.CaptchaWrapper, error) {
+func (session *SingleSession) CheckStockStatus(productURL structs.ProductURL, webshop webshop.Webshop, debugScreenshots bool) (bool, bool, bool, *structs.CaptchaWrapper, error) {
 
-	inStock, inStockCartButton, captcha, captchaSrc, err := webshop.CheckStockStatusSelenium(session.Webdriver, productURL)
+	inStock, inStockCartButton, captcha, captchaSrc, err := webshop.CheckStockStatusSelenium(session.Webdriver, productURL, debugScreenshots)
 
 	captchaStruct := &structs.CaptchaWrapper{
 		CaptchaURL: captchaSrc,

@@ -226,7 +226,7 @@ func (shop *Webshop) CheckoutSidebar(useAddToCartButton bool, product structs.Pr
 	return nil
 }
 
-func (shop *Webshop) CheckStockStatusSelenium(webdriver selenium.WebDriver, productURL structs.ProductURL) (bool, bool, bool, string, error) {
+func (shop *Webshop) CheckStockStatusSelenium(webdriver selenium.WebDriver, productURL structs.ProductURL, debugScreenshots bool) (bool, bool, bool, string, error) {
 	err := webdriver.Get(productURL.URL + "/ref=olp-opf-redir?aod=1&ie=UTF8&condition=all")
 	if err != nil {
 		return false, false, false, "", err
@@ -252,15 +252,19 @@ func (shop *Webshop) CheckStockStatusSelenium(webdriver selenium.WebDriver, prod
 
 			}
 		}
-		screenshot, err := webdriver.Screenshot()
-		if err != nil {
-			fmt.Println("Failed to save screenshot")
+		if debugScreenshots {
+			screenshot, screenshotErr := webdriver.Screenshot()
+			if screenshotErr != nil {
+				fmt.Println("Failed to screenshot")
+			}
+			imagePath, screenshotErr := helperfuncs.SaveImage(productURL.Name, screenshot)
+			if screenshotErr != nil {
+				fmt.Println("Failed to save screenshot")
+			}
+			return false, false, false, "", fmt.Errorf("Page not correctly loaded or something. Screenshot saved under %s (%v)", imagePath, err)
 		}
 
-		imagePath, err := helperfuncs.SaveImage(productURL.Name, screenshot)
-		err = fmt.Errorf("Page not correctly loaded or something. Screenshot saved under %s (%v)", imagePath, err)
-
-		return false, false, false, "", err
+		return false, false, false, "", fmt.Errorf("Page not correctly loaded or something (%v)", err)
 	}
 
 	/* //we only check sidebar, not the main page
@@ -275,7 +279,7 @@ func (shop *Webshop) CheckStockStatusSelenium(webdriver selenium.WebDriver, prod
 	}
 	*/
 
-	inStockCart, err := shop.CheckStockSidebar(webdriver, productURL)
+	inStockCart, err := shop.CheckStockSidebar(webdriver, productURL, debugScreenshots)
 
 	//we return the same var twice here since if its in stock in the side bar, it will always be as add-to-cart
 	return inStockCart, inStockCart, false, "", err
@@ -313,7 +317,7 @@ func checkOffer(webdriver selenium.WebDriver, productURL structs.ProductURL, par
 	return true, &addToCartButton, nil
 }
 
-func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL structs.ProductURL) (bool, error) {
+func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL structs.ProductURL, debugScreenshots bool) (bool, error) {
 
 	err := webdriver.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		//for {
@@ -328,13 +332,18 @@ func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL 
 		//}
 	}, 5*time.Second, 10*time.Millisecond)
 	if err != nil {
-		screenshot, err := webdriver.Screenshot()
-		if err != nil {
-			fmt.Println("Failed to save screenshot")
+		if debugScreenshots {
+			screenshot, screenshotErr := webdriver.Screenshot()
+			if screenshotErr != nil {
+				fmt.Println("Failed to screenshot")
+			}
+			imagePath, screenshotErr := helperfuncs.SaveImage(productURL.Name, screenshot)
+			if screenshotErr != nil {
+				fmt.Println("Failed to save screenshot")
+			}
+			return false, fmt.Errorf("timed out looking for all-offers-display-scroller element. Screenshot saved under %s (%v)", imagePath, err)
 		}
-
-		imagePath, err := helperfuncs.SaveImage(productURL.Name, screenshot)
-		return false, fmt.Errorf("timed out looking for all-offers-display-scroller element. Screenshot saved under %s (%v)", imagePath, err)
+		return false, fmt.Errorf("timed out looking for all-offers-display-scroller element (%v)", err)
 	}
 
 	err = webdriver.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
@@ -350,13 +359,19 @@ func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL 
 		//}
 	}, 5*time.Second, 10*time.Millisecond)
 	if err != nil {
-		screenshot, err := webdriver.Screenshot()
-		if err != nil {
-			fmt.Println("Failed to save screenshot")
-		}
 
-		imagePath, err := helperfuncs.SaveImage(productURL.Name, screenshot)
-		return false, fmt.Errorf("timed out looking for aod-pinned-offer element. Screenshot saved under %s (%v)", imagePath, err)
+		if debugScreenshots {
+			screenshot, screenshotErr := webdriver.Screenshot()
+			if screenshotErr != nil {
+				fmt.Println("Failed to screenshot")
+			}
+			imagePath, screenshotErr := helperfuncs.SaveImage(productURL.Name, screenshot)
+			if screenshotErr != nil {
+				fmt.Println("Failed to save screenshot")
+			}
+			return false, fmt.Errorf("timed out looking for all-offers-display-scroller element. Screenshot saved under %s (%v)", imagePath, err)
+		}
+		return false, fmt.Errorf("timed out looking for aod-pinned-offer element (%v)", err)
 	}
 
 	pinnedOffer, err := webdriver.FindElement(selenium.ByID, "aod-pinned-offer")

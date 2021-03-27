@@ -106,7 +106,7 @@ func (handler *StockAlertHandler) stockChecker(wgSeleniumExit *sync.WaitGroup, c
 			return
 		default:
 			checkStartTime := time.Now()
-			inStock, useAddToCartButton, captcha, captchaData, err := seleniumSession.CheckStockStatus(productURL, webshop)
+			inStock, useAddToCartButton, captcha, captchaData, err := seleniumSession.CheckStockStatus(productURL, webshop, globalConfig.DebugScreenshots)
 			if err != nil {
 				helperfuncs.Log(handler.addMetrics("Failed to check stock for %s [URL: %s] (%v)", taskID), productURL.Name, productURL.URL, err)
 			} else {
