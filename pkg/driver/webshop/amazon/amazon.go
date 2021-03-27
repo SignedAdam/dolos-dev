@@ -384,7 +384,13 @@ func (shop *Webshop) CheckStockStatusSelenium(webdriver selenium.WebDriver, prod
 
 			}
 		}
-		err = fmt.Errorf("captcha img not found... ")
+		err = fmt.Errorf("Page not correctly loaded or something. Please check!")
+		currentWindowHandle, err := webdriver.CurrentWindowHandle()
+		if err != nil {
+			return false, false, false, "", fmt.Errorf("SOMETHING HAS GONE TERRIBLY WRONG")
+		}
+		webdriver.SwitchWindow(currentWindowHandle)
+		time.Sleep(30 * time.Second)
 
 		return false, false, false, "", err
 	}
@@ -452,7 +458,7 @@ func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL 
 		}
 		return false, nil
 		//}
-	}, 10*time.Millisecond, 5*time.Second)
+	}, 5*time.Second, 10*time.Millisecond)
 	if err != nil {
 		return false, fmt.Errorf("timed out looking for aod-pinned-offer element (%v)", err)
 	}
