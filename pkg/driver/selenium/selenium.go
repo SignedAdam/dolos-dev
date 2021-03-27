@@ -199,6 +199,12 @@ func (session *SingleSession) CheckStockStatus(productURL structs.ProductURL, pr
 }
 
 func (handler *SeleniumHandler) Checkout(useAddToCartButton bool, webshop webshop.Webshop, product structs.ProductURL) error {
+	//will mark checkout session as not busy
+	unbusyFunc := func(session *Session) {
+		handler.Lock()
+		session.busy = false
+		handler.Unlock()
+	}
 
 	//refresh page
 	//handler.sessions[0].webdriver.Refresh()
@@ -207,14 +213,13 @@ func (handler *SeleniumHandler) Checkout(useAddToCartButton bool, webshop websho
 		return fmt.Errorf("No free sessions available to checkout product %s", product.Name)
 	}
 
+	defer unbusyFunc(session)
+
 	err := webshop.CheckoutSidebar(useAddToCartButton, product, session.webdriver)
 	if err != nil {
 		return fmt.Errorf("Failed to checkout product %s (%v)", product.Name, err)
 	}
 
-	handler.Lock()
-	session.busy = false
-	handler.Unlock()
 	return nil
 }
 

@@ -7,6 +7,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/tebeka/selenium"
 	"golang.org/x/net/html"
@@ -198,6 +199,10 @@ func (shop *Webshop) CheckoutSidebar(useAddToCartButton bool, product structs.Pr
 		return err
 	}
 
+	if len(offers) == 0 {
+		return fmt.Errorf("No stock found")
+	}
+
 	var offerError error
 	for _, offer := range offers {
 
@@ -297,6 +302,18 @@ func LogInSelenium(username, password string, webdriver selenium.WebDriver, sign
 	//fill password textbox
 	err = elemPassword.SendKeys(password)
 
+	//find "keep me signed in" button
+	elemRememberMe, err := webdriver.FindElement(selenium.ByName, "rememberMe")
+	if err != nil {
+		return fmt.Errorf("Could not find remember me checkbox element (%v)", err)
+	}
+
+	//check checkbox
+	err = elemRememberMe.Click()
+	if err != nil {
+		return fmt.Errorf("Could not click remember me checkbox element (%v)", err)
+	}
+
 	//click sign in button
 	elemSignIn, err := webdriver.FindElement(selenium.ByCSSSelector, "#signInSubmit")
 	if err != nil {
@@ -304,13 +321,13 @@ func LogInSelenium(username, password string, webdriver selenium.WebDriver, sign
 	}
 	elemSignIn.Click()
 
-	//WAIT FOR  to appear
+	//WAIT FOR search field to appear
 
 	webdriver.Wait(func(wd selenium.WebDriver) (bool, error) {
 		//for {
 		elemPassword, err := webdriver.FindElement(selenium.ByClassName, "#nav-search-field")
 		if err != nil {
-			return false, fmt.Errorf("Could not find password element (%v)", err)
+			return false, nil
 		}
 		if elemPassword != nil {
 			return true, nil
@@ -391,14 +408,10 @@ func (shop *Webshop) CheckStockStatusSelenium(webdriver selenium.WebDriver, prod
 }
 
 func checkOffer(webdriver selenium.WebDriver, productURL structs.ProductURL, parentElement selenium.WebElement) (bool, *selenium.WebElement, error) {
-	fmt.Println(parentElement.Text())
-
 	pinnedOfferPrice, err := parentElement.FindElement(selenium.ByCSSSelector, ".a-price-whole")
 	if err != nil {
 		return false, nil, err
 	}
-
-	fmt.Println(pinnedOfferPrice.Text())
 
 	//make sure price is within parameters
 	priceString, err := pinnedOfferPrice.Text()
@@ -428,6 +441,22 @@ func checkOffer(webdriver selenium.WebDriver, productURL structs.ProductURL, par
 
 func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL structs.ProductURL) (bool, error) {
 
+	err := webdriver.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+		//for {
+		pinnedOffer, err := webdriver.FindElement(selenium.ByID, "aod-pinned-offer")
+		if err != nil {
+			return false, nil //fmt.Errorf("Could not find password element (%v)", err)
+		}
+		if pinnedOffer != nil {
+			return true, nil
+		}
+		return false, nil
+		//}
+	}, 10*time.Millisecond, 5*time.Second)
+	if err != nil {
+		return false, fmt.Errorf("timeout or what? (%v)", err)
+	}
+
 	pinnedOffer, err := webdriver.FindElement(selenium.ByID, "aod-pinned-offer")
 	if err == nil {
 		inStockSidebarPinned, _, _ := checkOffer(webdriver, productURL, pinnedOffer)
@@ -447,6 +476,10 @@ func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL 
 	offers, err := offerList.FindElements(selenium.ByID, "aod-offer")
 	if err != nil {
 		return false, err
+	}
+
+	if len(offers) == 0 {
+		return false, nil
 	}
 
 	var offerError error
