@@ -1,82 +1,82 @@
 [
-    {
-        "ip": "3.17.149.250", 
-        "port": "3128",
-        "user": "ooga",
-        "password":"booga",
-
-        "last_used_amazon": ""
-    },
-    {
-        "ip": "3.128.246.14", 
-        "port": "3128",
-        "user": "ooga",
-        "password":"booga",
-
-        "last_used_amazon": ""
-    },
-    {
-        "ip": "3.14.7.100", 
-        "port": "3128",
-        "user": "ooga",
-        "password":"booga",
-
-        "last_used_amazon": ""
-    },
-    {
-        "ip": "13.58.146.137",
-        "port": "3128",
-        "user":"ooga",
-        "password": "booga",
-        
-        "last_used_amazon": ""
-    },
-    {
-        "ip": "13.59.56.138",
-        "port": "3128",
-        "user":"ooga",
-        "password": "booga",
-        
-        "last_used_amazon": ""
-    },
-    {
-        "ip": "3.139.74.79",
-        "port": "3128",
-        "user":"ooga",
-        "password": "booga",
-        
-        "last_used_amazon": ""
-    },
-    {
-        "ip": "3.131.99.247",
-        "port": "3128",
-        "user":"ooga",
-        "password": "booga",
-        
-        "last_used_amazon": ""
-    },
-    {
-        "ip": "3.19.238.218",
-        "port": "3128",
-        "user":"ooga",
-        "password": "booga",
-        
-        "last_used_amazon": ""
-    },
-    {
-        "ip": "18.188.117.2",
-        "port": "3128",
-        "user":"ooga",
-        "password": "booga",
-        
-        "last_used_amazon": ""
-    },
-    {
-        "ip": "3.17.10.37",
-        "port": "3128",
-        "user":"ooga",
-        "password": "booga",
-        
-        "last_used_amazon": ""
-    }
+	{
+		"IP": "18.184.11.218",
+		"Port": "3128",
+		"User": "ooga",
+		"Password": "booga",
+		"InUse": false,
+		"LastUsedAmazon": "0001-01-01T00:00:00Z"
+	},
+	{
+		"IP": "18.196.176.11",
+		"Port": "3128",
+		"User": "ooga",
+		"Password": "booga",
+		"InUse": false,
+		"LastUsedAmazon": "0001-01-01T00:00:00Z"
+	},
+	{
+		"IP": "18.185.111.131",
+		"Port": "3128",
+		"User": "ooga",
+		"Password": "booga",
+		"InUse": false,
+		"LastUsedAmazon": "0001-01-01T00:00:00Z"
+	},
+	{
+		"IP": "18.157.182.210",
+		"Port": "3128",
+		"User": "ooga",
+		"Password": "booga",
+		"InUse": false,
+		"LastUsedAmazon": "0001-01-01T00:00:00Z"
+	},
+	{
+		"IP": "3.65.21.118",
+		"Port": "3128",
+		"User": "ooga",
+		"Password": "booga",
+		"InUse": false,
+		"LastUsedAmazon": "0001-01-01T00:00:00Z"
+	},
+	{
+		"IP": "13.53.119.30",
+		"Port": "3128",
+		"User": "ooga",
+		"Password": "booga",
+		"InUse": false,
+		"LastUsedAmazon": "0001-01-01T00:00:00Z"
+	},
+	{
+		"IP": "13.53.107.0",
+		"Port": "3128",
+		"User": "ooga",
+		"Password": "booga",
+		"InUse": false,
+		"LastUsedAmazon": "0001-01-01T00:00:00Z"
+	},
+	{
+		"IP": "13.48.133.74",
+		"Port": "3128",
+		"User": "ooga",
+		"Password": "booga",
+		"InUse": false,
+		"LastUsedAmazon": "0001-01-01T00:00:00Z"
+	},
+	{
+		"IP": "13.53.122.241",
+		"Port": "3128",
+		"User": "ooga",
+		"Password": "booga",
+		"InUse": false,
+		"LastUsedAmazon": "0001-01-01T00:00:00Z"
+	},
+	{
+		"IP": "13.51.13.234",
+		"Port": "3128",
+		"User": "ooga",
+		"Password": "booga",
+		"InUse": false,
+		"LastUsedAmazon": "0001-01-01T00:00:00Z"
+	}
 ]
