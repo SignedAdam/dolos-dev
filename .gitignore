@@ -4,4 +4,4 @@
 !.vscode/launch.json
 !.vscode/extensions.json
 *.code-workspace
-/stockalert-config/*
+stockalert-config/*
