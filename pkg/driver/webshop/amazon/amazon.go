@@ -122,7 +122,7 @@ func (shop *Webshop) CheckoutSidebar(useAddToCartButton bool, product structs.Pr
 		}
 	*/
 	go webdriver.Get(product.URL + "/ref=olp-opf-redir?aod=1&ie=UTF8&condition=all")
-	err := webdriver.Get(fmt.Sprintf("https://www.amazon.de/gp/aod/ajax/ref=dp_aod_unknown_mbc?asin=%s&m=", product.ASIN))
+	err := webdriver.Get(fmt.Sprintf("https://www.amazon%s/gp/aod/ajax/ref=dp_aod_unknown_mbc?asin=%s&m=", getCountryCodeFromKind(shop.Kind), product.ASIN))
 	if err != nil {
 		return fmt.Errorf("Failed to make ajax request to get sidebar product list (%v)", err)
 	}
@@ -192,7 +192,7 @@ func (shop *Webshop) CheckStockStatusSelenium(webdriver selenium.WebDriver, prod
 		}
 	*/
 	//go webdriver.Get(productURL.URL + "/ref=olp-opf-redir?aod=1&ie=UTF8&condition=all")
-	err := webdriver.Get(fmt.Sprintf("https://www.amazon.de/gp/aod/ajax/ref=dp_aod_unknown_mbc?asin=%s&m=", productURL.ASIN))
+	err := webdriver.Get(fmt.Sprintf("https://www.amazon%s/gp/aod/ajax/ref=dp_aod_unknown_mbc?asin=%s&m=", getCountryCodeFromKind(shop.Kind), productURL.ASIN))
 	if err != nil {
 		return false, false, false, "", fmt.Errorf("Failed to make ajax request to get sidebar product list (%v)", err)
 	}

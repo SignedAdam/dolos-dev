@@ -63,6 +63,7 @@ func main() {
 		fmt.Println("Closed all selenium checkout related processes")
 		handler.exitHandler()
 		handler.mutex.Unlock()
+		helperfuncs.KillProcesses("chromedriver.exe", "OpenJDK Platform binary", "Runtime Broker")
 		chanReadyForExit <- true
 	}()
 
@@ -111,6 +112,10 @@ func main() {
 	<-chanReadyForExit
 
 	log.Println("Server stopped")
+}
+
+func (handler *StockAlertHandler) hekill() {
+
 }
 
 func (handler *StockAlertHandler) exitHandler() {
