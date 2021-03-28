@@ -246,10 +246,10 @@ func (shop *Webshop) CheckStockStatusSelenium(webdriver selenium.WebDriver, prod
 	}
 	*/
 
-	inStockCart, err := shop.CheckStockSidebar(webdriver, productURL, debugScreenshots)
+	inStockCart, foundCaptcha, err := shop.CheckStockSidebar(webdriver, productURL, debugScreenshots)
 
 	//we return the same var twice here since if its in stock in the side bar, it will always be as add-to-cart
-	return inStockCart, inStockCart, false, "", err
+	return inStockCart, inStockCart, foundCaptcha, "", err
 }
 
 func checkOffer(webdriver selenium.WebDriver, productURL structs.ProductURL, parentElement selenium.WebElement) (bool, *selenium.WebElement, error) {
@@ -284,9 +284,43 @@ func checkOffer(webdriver selenium.WebDriver, productURL structs.ProductURL, par
 	return true, &addToCartButton, nil
 }
 
-func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL structs.ProductURL, debugScreenshots bool) (bool, error) {
+func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL structs.ProductURL, debugScreenshots bool) (bool, bool, error) {
+	_, err := webdriver.FindElement(selenium.ByCSSSelector, "#a-declarative")
+	if err != nil {
+		//couldn't find product title. Maybe captcha?
+		images, err := webdriver.FindElements(selenium.ByTagName, "#img")
+		if err != nil {
+			err = fmt.Errorf("Page not correctly loaded (%v)", err)
+			return false, false, err
+		}
+		for _, img := range images {
+			imgSrc, err := img.GetAttribute("src")
+			if err != nil {
+				err = fmt.Errorf("img has no src attribute (%v)", err)
 
-	err := webdriver.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+			} else {
+				if strings.Contains(imgSrc, "captcha") {
+					return false, true, err
+				}
+
+			}
+		}
+		if debugScreenshots {
+			screenshot, screenshotErr := webdriver.Screenshot()
+			if screenshotErr != nil {
+				fmt.Println("Failed to screenshot")
+			}
+			imagePath, screenshotErr := helperfuncs.SaveImage(productURL.Name, screenshot)
+			if screenshotErr != nil {
+				fmt.Println("Failed to save screenshot")
+			}
+			return false, false, fmt.Errorf("Page not correctly loaded or something. Screenshot saved under %s (%v)", imagePath, err)
+		}
+
+		return false, false, fmt.Errorf("Page not correctly loaded or something (%v)", err)
+	}
+
+	err = webdriver.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		//for {
 		pinnedOffer, err := webdriver.FindElement(selenium.ByCSSSelector, "#all-offers-display-scroller")
 		if err != nil {
@@ -309,9 +343,9 @@ func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL 
 			if screenshotErr != nil {
 				fmt.Println("Failed to save screenshot")
 			}
-			return false, fmt.Errorf("timed out looking for all-offers-display-scroller element. Screenshot saved under %s (%v)", imagePath, err)
+			return false, false, fmt.Errorf("timed out looking for all-offers-display-scroller element. Screenshot saved under %s (%v)", imagePath, err)
 		}
-		return false, fmt.Errorf("timed out looking for all-offers-display-scroller element (%v)", err)
+		return false, false, fmt.Errorf("timed out looking for all-offers-display-scroller element (%v)", err)
 	}
 
 	err = webdriver.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
@@ -337,16 +371,16 @@ func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL 
 			if screenshotErr != nil {
 				fmt.Println("Failed to save screenshot")
 			}
-			return false, fmt.Errorf("timed out looking for all-offers-display-scroller element. Screenshot saved under %s (%v)", imagePath, err)
+			return false, false, fmt.Errorf("timed out looking for all-offers-display-scroller element. Screenshot saved under %s (%v)", imagePath, err)
 		}
-		return false, fmt.Errorf("timed out looking for aod-pinned-offer element (%v)", err)
+		return false, false, fmt.Errorf("timed out looking for aod-pinned-offer element (%v)", err)
 	}
 
 	pinnedOffer, err := webdriver.FindElement(selenium.ByCSSSelector, "#aod-pinned-offer")
 	if err == nil {
 		inStockSidebarPinned, _, _ := checkOffer(webdriver, productURL, pinnedOffer)
 		if inStockSidebarPinned {
-			return true, nil
+			return true, false, nil
 		}
 	}
 
@@ -354,17 +388,17 @@ func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL 
 	//div id aod-offer-list
 	offerList, err := webdriver.FindElement(selenium.ByCSSSelector, "#aod-offer-list")
 	if err != nil {
-		return false, fmt.Errorf("Could not find sidebar offer list (%v)", err)
+		return false, false, fmt.Errorf("Could not find sidebar offer list (%v)", err)
 	}
 
 	//loop through div id [aod-offer] elements
 	offers, err := offerList.FindElements(selenium.ByCSSSelector, "#aod-offer")
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
 
 	if len(offers) == 0 {
-		return false, nil
+		return false, false, nil
 	}
 
 	var offerError error
@@ -372,7 +406,7 @@ func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL 
 
 		inStock, _, err := checkOffer(webdriver, productURL, offer)
 		if inStock {
-			return true, nil
+			return true, false, nil
 		}
 
 		if err != nil {
@@ -381,10 +415,10 @@ func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL 
 	}
 
 	if offerError != nil {
-		return false, err
+		return false, false, err
 	}
 
-	return false, nil
+	return false, false, nil
 }
 
 func checkout(webdriver selenium.WebDriver, product structs.ProductURL, addToCartButton selenium.WebElement) error {
