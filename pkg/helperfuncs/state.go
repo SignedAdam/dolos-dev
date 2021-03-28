@@ -64,6 +64,12 @@ func LoadState(productURLs *[]*structs.ProductURL) (err error) {
 		return fmt.Errorf("Failed to unmarshal json to Product URLs config (%v)", err)
 	}
 
+	for _, productURL := range *productURLs {
+		urlSplit := strings.Split(productURL.URL, "/")
+
+		productURL.ASIN = urlSplit[len(urlSplit)-1]
+	}
+
 	return nil
 }
 

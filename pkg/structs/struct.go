@@ -7,6 +7,7 @@ type ProductURL struct {
 	ID               int `json:"id"`
 	Name             string
 	URL              string
+	ASIN             string
 	MinPrice         int `json:"min_price"`
 	MaxPrice         int `json:"max_price"`
 	Threads          int

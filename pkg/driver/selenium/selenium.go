@@ -27,6 +27,7 @@ type SeleniumHandler struct {
 type Session struct {
 	id        int
 	webdriver selenium.WebDriver
+	kind      structs.Webshop
 	//seleniumService *selenium.Service
 	busy bool
 }
@@ -60,7 +61,7 @@ func (handler *SeleniumHandler) CreateCheckoutSessions(sessionCount int, ctx con
 		return fmt.Errorf("Failed to start one or more selenium sessions")
 	}*/
 
-	go handler.sessionKeepAlive(ctx)
+	go handler.sessionKeepAlive(ctx, globalConfig)
 
 	return nil
 }
@@ -108,7 +109,8 @@ func (handler *SeleniumHandler) NewSession(proxies *[]structs.Proxy) (*SingleSes
 func (handler *SeleniumHandler) createSession(wg *sync.WaitGroup, id int, webshopKind structs.Webshop, username, password string) {
 	//we add the session to the handler immediately, so any parent functions will already know it's being worked on
 	newSession := &Session{
-		id: id,
+		id:   id,
+		kind: webshopKind,
 	}
 	handler.addSessionSafe(webshopKind, newSession)
 
@@ -161,7 +163,7 @@ func createSingleSession( /*port int,*/ proxies []structs.Proxy) (selenium.WebDr
 		chromeCaps := chrome.Capabilities{
 			Path: "",
 			Args: []string{
-				"--blink-settings=imagesEnabled=false", // <<<
+				//"--blink-settings=imagesEnabled=false", // <<<
 				"--disable-gpu",
 				"--disable-sandbox",
 			}}
@@ -353,6 +355,23 @@ func getSignInURLAndFunc(webshopKind structs.Webshop) (string, func(string, stri
 	return "", nil
 }
 
+func getUserSessionKeepAliveFunc(webshopKind structs.Webshop) func(selenium.WebDriver, structs.GlobalConfig, structs.Webshop) error {
+	switch webshopKind {
+	case structs.WEBSHOP_AMAZON:
+		return amazonws.KeepUserSessionAlive
+	case structs.WEBSHOP_AMAZONNL:
+		return amazonws.KeepUserSessionAlive
+	case structs.WEBSHOP_AMAZONDE:
+		return amazonws.KeepUserSessionAlive
+	case structs.WEBSHOP_AMAZONFR:
+		return amazonws.KeepUserSessionAlive
+	case structs.WEBSHOP_AMAZONIT:
+		return amazonws.KeepUserSessionAlive
+	}
+
+	return nil
+}
+
 func (handler *SeleniumHandler) addSessionSafe(webshopKind structs.Webshop, session *Session) {
 	handler.Lock()
 	handler.sessions[webshopKind] = append(handler.sessions[webshopKind], session)
@@ -371,7 +390,7 @@ func (handler *SeleniumHandler) getInactiveSession(webshopKind structs.Webshop) 
 	return nil
 }
 
-func (handler *SeleniumHandler) sessionKeepAlive(ctx context.Context) {
+func (handler *SeleniumHandler) sessionKeepAlive(ctx context.Context, globalConfig structs.GlobalConfig) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -382,6 +401,12 @@ func (handler *SeleniumHandler) sessionKeepAlive(ctx context.Context) {
 			for _, webshopSessions := range handler.sessions {
 				for _, session := range webshopSessions {
 					session.webdriver.Refresh()
+
+					userSessionKeepAliveFunc := getUserSessionKeepAliveFunc(session.kind)
+					err := userSessionKeepAliveFunc(session.webdriver, globalConfig, session.kind)
+					if err != nil {
+						fmt.Println(fmt.Errorf("[user session keep alive] Failed to keep user session alive (%v)", err))
+					}
 				}
 			}
 			handler.Unlock()

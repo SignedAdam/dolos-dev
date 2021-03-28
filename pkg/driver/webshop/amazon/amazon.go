@@ -29,62 +29,6 @@ func (shop *Webshop) GetKind() structs.Webshop {
 	return shop.Kind
 }
 
-//CheckStockStatus checks if a product is in stock on Amazon. Takes a ProductURL struct
-//returns:
-//bool inStock - boolean representing whether or not the item is in stock
-//bool inStockCartButton - boolean representing whether or not the item is in stock, but only with a add to cart button
-//bool captcha - boolan representing whether or not a captcha is returned on the page and needs to be solved to proceed
-//struct CaptchaWrapper - struct containing all the necessary information about a captcha if one is present
-//error - in case something goes wrong in the request
-func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy structs.Proxy) (bool, bool, bool, *structs.CaptchaWrapper, error) {
-	body, err := helperfuncs.GetBodyHTML(productURL.URL, proxy.IP, proxy.Port, proxy.User, proxy.Password)
-	if err != nil {
-		fmt.Println(fmt.Errorf("Failed to get body (%v)", err))
-		return false, false, false, nil, err
-	}
-
-	bodyOK, inStock, inStockCartButton, captcha, captchaURL := checkStockStatus(body)
-
-	if captcha {
-		//generate session id
-		sessionID := helperfuncs.GenerateRandomString(6)
-
-		captchaWrapper := &structs.CaptchaWrapper{
-			CaptchaURL: captchaURL,
-			SessionID:  sessionID,
-		}
-		return false, false, true, captchaWrapper, nil
-	}
-
-	//we check if the body contains an expected element, if it does not, then something went wrong while loading the page
-	if !bodyOK && !inStock && !inStockCartButton {
-		err = fmt.Errorf("Body failed to properly load for some reason...")
-
-		return false, false, false, nil, err
-	}
-
-	return inStock, inStockCartButton, false, nil, nil
-}
-
-func getCountryCode(url string) string {
-	if strings.Contains(url, "amazon.com") {
-		return ".com"
-	}
-	if strings.Contains(url, "amazon.fr") {
-		return ".fr"
-	}
-	if strings.Contains(url, "amazon.de") {
-		return ".de"
-	}
-	if strings.Contains(url, "amazon.nl") {
-		return ".nl"
-	}
-	if strings.Contains(url, "amazon.it") {
-		return ".it"
-	}
-	return "ERROR"
-}
-
 func (shop *Webshop) Checkout(useAddToCartButton bool, product structs.ProductURL, webdriver selenium.WebDriver) error {
 
 	fmt.Println("Attempting to checkout product ", product.Name)
@@ -171,8 +115,16 @@ func (shop *Webshop) Checkout(useAddToCartButton bool, product structs.ProductUR
 func (shop *Webshop) CheckoutSidebar(useAddToCartButton bool, product structs.ProductURL, webdriver selenium.WebDriver) error {
 
 	fmt.Println("Attempting to checkout product ", product.Name)
-	if err := webdriver.Get(product.URL + "/ref=olp-opf-redir?aod=1&ie=UTF8&condition=all"); err != nil {
-		return err
+
+	/*
+		if err := webdriver.Get(product.URL + "/ref=olp-opf-redir?aod=1&ie=UTF8&condition=all"); err != nil {
+			return err
+		}
+	*/
+	go webdriver.Get(product.URL + "/ref=olp-opf-redir?aod=1&ie=UTF8&condition=all")
+	err := webdriver.Get(fmt.Sprintf("https://www.amazon.de/gp/aod/ajax/ref=dp_aod_unknown_mbc?asin=%s&m=", product.ASIN))
+	if err != nil {
+		return fmt.Errorf("Failed to make ajax request to get sidebar product list (%v)", err)
 	}
 	/*
 		pinnedOffer, err := webdriver.FindElement(selenium.ByID, "aod-pinned-offer")
@@ -227,12 +179,25 @@ func (shop *Webshop) CheckoutSidebar(useAddToCartButton bool, product structs.Pr
 }
 
 func (shop *Webshop) CheckStockStatusSelenium(webdriver selenium.WebDriver, productURL structs.ProductURL, debugScreenshots bool) (bool, bool, bool, string, error) {
-	err := webdriver.Get(productURL.URL + "/ref=olp-opf-redir?aod=1&ie=UTF8&condition=all")
+	/*
+		err := webdriver.Get(productURL.URL + "/ref=olp-opf-redir?aod=1&ie=UTF8&condition=all")
+		if err != nil {
+			return false, false, false, "", err
+		}
+	*/
+
+	/*
+		if err := webdriver.Get(product.URL + "/ref=olp-opf-redir?aod=1&ie=UTF8&condition=all"); err != nil {
+			return err
+		}
+	*/
+	//go webdriver.Get(productURL.URL + "/ref=olp-opf-redir?aod=1&ie=UTF8&condition=all")
+	err := webdriver.Get(fmt.Sprintf("https://www.amazon.de/gp/aod/ajax/ref=dp_aod_unknown_mbc?asin=%s&m=", productURL.ASIN))
 	if err != nil {
-		return false, false, false, "", err
+		return false, false, false, "", fmt.Errorf("Failed to make ajax request to get sidebar product list (%v)", err)
 	}
 
-	_, err = webdriver.FindElement(selenium.ByCSSSelector, "#productTitle")
+	/*_, err = webdriver.FindElement(selenium.ByCSSSelector, "#productTitle")
 	if err != nil {
 		//couldn't find product title. Maybe captcha?
 		images, err := webdriver.FindElements(selenium.ByTagName, "#img")
@@ -264,8 +229,10 @@ func (shop *Webshop) CheckStockStatusSelenium(webdriver selenium.WebDriver, prod
 			return false, false, false, "", fmt.Errorf("Page not correctly loaded or something. Screenshot saved under %s (%v)", imagePath, err)
 		}
 
+
 		return false, false, false, "", fmt.Errorf("Page not correctly loaded or something (%v)", err)
 	}
+	*/
 
 	/* //we only check sidebar, not the main page
 	_, err = webdriver.FindElement(selenium.ByID, "buy-now-button")
@@ -516,7 +483,6 @@ func LogInSelenium(username, password string, webdriver selenium.WebDriver, sign
 	elemSignIn.Click()
 
 	//WAIT FOR search field to appear
-
 	webdriver.Wait(func(wd selenium.WebDriver) (bool, error) {
 		//for {
 		elemSearchBox, err := webdriver.FindElement(selenium.ByID, "twotabsearchtextbox")
@@ -530,6 +496,100 @@ func LogInSelenium(username, password string, webdriver selenium.WebDriver, sign
 		//}
 	})
 	return nil
+}
+
+func KeepUserSessionAlive(webdriver selenium.WebDriver, globalConfig structs.GlobalConfig, webshopKind structs.Webshop) error {
+	//go to acount page
+	//gp/css/homepage.html?ref_=nav_youraccount_btn
+	err := webdriver.Get(fmt.Sprintf("https://www.amazon%s/gp/css/account/info/view.html", getCountryCodeFromKind(webshopKind)))
+	if err != nil {
+		return fmt.Errorf("[user session keep alive] Failed to navigate to account info link (%v)", err)
+	}
+	/*
+		//go
+		var loginAndSecurityCell selenium.WebElement
+		yardCells, _ := webdriver.FindElements(selenium.ByCSSSelector, "#ya-card-cell")
+		for _, cell := range yardCells {
+			cellTitle, _ := webdriver.FindElement(selenium.ByCSSSelector, "#a-spacing-none ya-card__heading--rich a-text-normal")
+			cellTitleText, err:= cellTitle.Text()
+			if err != nil {
+				continue
+			}
+			if cellTitleText == "Login & security" {
+				loginAndSecurityCell = cell
+			}
+		}
+
+		if loginAndSecurityCell == nil {
+
+		}
+	*/
+
+	passwordText, err := webdriver.FindElement(selenium.ByCSSSelector, "ap_password")
+	if err != nil {
+		//return fmt.Errorf("Failed to find password field (%v)", err)
+
+		//password field not here > check for user data form
+		_, err := webdriver.FindElement(selenium.ByCSSSelector, "#cnep_1a_name_form")
+		if err != nil {
+			return fmt.Errorf("Failed to find either the password field or the user data form (%v)", err)
+		}
+		//if exists, we good
+		return nil
+	}
+
+	err = passwordText.SendKeys(globalConfig.AmazonPassword)
+	if err != nil {
+		return fmt.Errorf("Failed to fill password field (%v)", err)
+	}
+
+	submitButton, err := webdriver.FindElement(selenium.ByCSSSelector, "signInSubmit")
+	if err != nil {
+		return fmt.Errorf("Failed to find submit button (%v)", err)
+	}
+
+	err = submitButton.Click()
+	if err != nil {
+		return fmt.Errorf("Failed to click submit button (%v)", err)
+	}
+
+	return nil
+
+}
+
+func getCountryCode(url string) string {
+	if strings.Contains(url, "amazon.com") {
+		return ".com"
+	}
+	if strings.Contains(url, "amazon.fr") {
+		return ".fr"
+	}
+	if strings.Contains(url, "amazon.de") {
+		return ".de"
+	}
+	if strings.Contains(url, "amazon.nl") {
+		return ".nl"
+	}
+	if strings.Contains(url, "amazon.it") {
+		return ".it"
+	}
+	return "ERROR"
+}
+
+func getCountryCodeFromKind(kind structs.Webshop) string {
+	switch kind {
+	case structs.WEBSHOP_AMAZON:
+		return ".com"
+	case structs.WEBSHOP_AMAZONDE:
+		return ".de"
+	case structs.WEBSHOP_AMAZONNL:
+		return ".nl"
+	case structs.WEBSHOP_AMAZONIT:
+		return ".it"
+	case structs.WEBSHOP_AMAZONFR:
+		return ".fr"
+	}
+	return "invalid"
 }
 
 func (shop *Webshop) SolveCaptcha(webdriver selenium.WebDriver, captchaToken string) error {
@@ -550,6 +610,43 @@ func (shop *Webshop) SolveCaptcha(webdriver selenium.WebDriver, captchaToken str
 	continueButton.Click()
 
 	return nil
+}
+
+//CheckStockStatus checks if a product is in stock on Amazon. Takes a ProductURL struct
+//returns:
+//bool inStock - boolean representing whether or not the item is in stock
+//bool inStockCartButton - boolean representing whether or not the item is in stock, but only with a add to cart button
+//bool captcha - boolan representing whether or not a captcha is returned on the page and needs to be solved to proceed
+//struct CaptchaWrapper - struct containing all the necessary information about a captcha if one is present
+//error - in case something goes wrong in the request
+func (shop *Webshop) CheckStockStatus(productURL structs.ProductURL, proxy structs.Proxy) (bool, bool, bool, *structs.CaptchaWrapper, error) {
+	body, err := helperfuncs.GetBodyHTML(productURL.URL, proxy.IP, proxy.Port, proxy.User, proxy.Password)
+	if err != nil {
+		fmt.Println(fmt.Errorf("Failed to get body (%v)", err))
+		return false, false, false, nil, err
+	}
+
+	bodyOK, inStock, inStockCartButton, captcha, captchaURL := checkStockStatus(body)
+
+	if captcha {
+		//generate session id
+		sessionID := helperfuncs.GenerateRandomString(6)
+
+		captchaWrapper := &structs.CaptchaWrapper{
+			CaptchaURL: captchaURL,
+			SessionID:  sessionID,
+		}
+		return false, false, true, captchaWrapper, nil
+	}
+
+	//we check if the body contains an expected element, if it does not, then something went wrong while loading the page
+	if !bodyOK && !inStock && !inStockCartButton {
+		err = fmt.Errorf("Body failed to properly load for some reason...")
+
+		return false, false, false, nil, err
+	}
+
+	return inStock, inStockCartButton, false, nil, nil
 }
 
 func checkStockStatus(body io.ReadCloser) (bool, bool, bool, bool, string) {
