@@ -121,7 +121,7 @@ func (shop *Webshop) CheckoutSidebar(useAddToCartButton bool, product structs.Pr
 			return err
 		}
 	*/
-	go webdriver.Get(product.URL + "/ref=olp-opf-redir?aod=1&ie=UTF8&condition=all")
+	//go webdriver.Get(product.URL + "/ref=olp-opf-redir?aod=1&ie=UTF8&condition=all")
 	err := webdriver.Get(fmt.Sprintf("https://www.amazon%s/gp/aod/ajax/ref=dp_aod_unknown_mbc?asin=%s&m=", getCountryCodeFromKind(shop.Kind), product.ASIN))
 	if err != nil {
 		return fmt.Errorf("Failed to make ajax request to get sidebar product list (%v)", err)
