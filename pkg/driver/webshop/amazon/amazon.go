@@ -321,7 +321,7 @@ func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL 
 
 	err := webdriver.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		//for {
-		pinnedOffer, err := webdriver.FindElement(selenium.ByID, "all-offers-display-scroller")
+		pinnedOffer, err := webdriver.FindElement(selenium.ByCSSSelector, "#all-offers-display-scroller")
 		if err != nil {
 			return false, nil //fmt.Errorf("Could not find password element (%v)", err)
 		}
@@ -331,6 +331,7 @@ func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL 
 		return false, nil
 		//}
 	}, 5*time.Second, 10*time.Millisecond)
+
 	if err != nil {
 		if debugScreenshots {
 			screenshot, screenshotErr := webdriver.Screenshot()
@@ -348,7 +349,7 @@ func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL 
 
 	err = webdriver.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		//for {
-		pinnedOffer, err := webdriver.FindElement(selenium.ByID, "aod-pinned-offer")
+		pinnedOffer, err := webdriver.FindElement(selenium.ByCSSSelector, "#aod-pinned-offer")
 		if err != nil {
 			return false, nil //fmt.Errorf("Could not find password element (%v)", err)
 		}
@@ -374,7 +375,7 @@ func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL 
 		return false, fmt.Errorf("timed out looking for aod-pinned-offer element (%v)", err)
 	}
 
-	pinnedOffer, err := webdriver.FindElement(selenium.ByID, "aod-pinned-offer")
+	pinnedOffer, err := webdriver.FindElement(selenium.ByCSSSelector, "#aod-pinned-offer")
 	if err == nil {
 		inStockSidebarPinned, _, _ := checkOffer(webdriver, productURL, pinnedOffer)
 		if inStockSidebarPinned {
@@ -384,13 +385,13 @@ func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL 
 
 	//find div element containing all products
 	//div id aod-offer-list
-	offerList, err := webdriver.FindElement(selenium.ByID, "aod-offer-list")
+	offerList, err := webdriver.FindElement(selenium.ByCSSSelector, "#aod-offer-list")
 	if err != nil {
 		return false, fmt.Errorf("Could not find sidebar offer list (%v)", err)
 	}
 
 	//loop through div id [aod-offer] elements
-	offers, err := offerList.FindElements(selenium.ByID, "aod-offer")
+	offers, err := offerList.FindElements(selenium.ByCSSSelector, "#aod-offer")
 	if err != nil {
 		return false, err
 	}
@@ -534,14 +535,14 @@ func LogInSelenium(username, password string, webdriver selenium.WebDriver, sign
 func (shop *Webshop) SolveCaptcha(webdriver selenium.WebDriver, captchaToken string) error {
 
 	//solve captchaaaa
-	captchaTextBox, err := webdriver.FindElement(selenium.ByID, "#captchacharacters")
+	captchaTextBox, err := webdriver.FindElement(selenium.ByCSSSelector, "#captchacharacters")
 	if err != nil {
 		return fmt.Errorf("Failed to find captcha text box element (%v)", err)
 	}
 
 	captchaTextBox.SendKeys(captchaToken)
 
-	continueButton, err := webdriver.FindElement(selenium.ByClassName, "#a-button-text")
+	continueButton, err := webdriver.FindElement(selenium.ByCSSSelector, "#a-button-text")
 	if err != nil {
 		return fmt.Errorf("Failed to find continue button element (%v)", err)
 	}
