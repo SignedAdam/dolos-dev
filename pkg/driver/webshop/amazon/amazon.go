@@ -285,8 +285,8 @@ func checkOffer(webdriver selenium.WebDriver, productURL structs.ProductURL, par
 }
 
 func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL structs.ProductURL, debugScreenshots bool) (bool, bool, error) {
-	_, err := webdriver.FindElement(selenium.ByCSSSelector, "#a-declarative")
-	if err != nil {
+	_, errVerifyPageLoaded := webdriver.FindElement(selenium.ByCSSSelector, "#aod-close")
+	if errVerifyPageLoaded != nil {
 		//couldn't find product title. Maybe captcha?
 		images, err := webdriver.FindElements(selenium.ByTagName, "#img")
 		if err != nil {
@@ -314,13 +314,13 @@ func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL 
 			if screenshotErr != nil {
 				fmt.Println("Failed to save screenshot")
 			}
-			return false, false, fmt.Errorf("Page not correctly loaded or something. Screenshot saved under %s (%v)", imagePath, err)
+			return false, false, fmt.Errorf("Page not correctly loaded or something. Screenshot saved under %s (%v)", imagePath, errVerifyPageLoaded)
 		}
 
-		return false, false, fmt.Errorf("Page not correctly loaded or something (%v)", err)
+		return false, false, fmt.Errorf("Page not correctly loaded or something (%v)", errVerifyPageLoaded)
 	}
 
-	err = webdriver.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
+	err := webdriver.WaitWithTimeoutAndInterval(func(wd selenium.WebDriver) (bool, error) {
 		//for {
 		pinnedOffer, err := webdriver.FindElement(selenium.ByCSSSelector, "#all-offers-display-scroller")
 		if err != nil {
