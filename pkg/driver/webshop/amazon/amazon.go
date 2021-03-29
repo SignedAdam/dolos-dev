@@ -577,7 +577,7 @@ func KeepUserSessionAlive(webdriver selenium.WebDriver, globalConfig structs.Glo
 		return fmt.Errorf("Failed to fill password field (%v)", err)
 	}
 
-	submitButton, err := webdriver.FindElement(selenium.ByCSSSelector, "signInSubmit")
+	submitButton, err := webdriver.FindElement(selenium.ByCSSSelector, "#signInSubmit")
 	if err != nil {
 		return fmt.Errorf("Failed to find submit button (%v)", err)
 	}
