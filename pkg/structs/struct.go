@@ -25,9 +25,10 @@ type CaptchaWrapper struct {
 }
 
 type GlobalConfig struct {
-	CaptchaSolverEndpoint       string `json:"captcha_solver_endpoint"`
-	CheckoutInstancesPerWebshop int    `json:"checkout_instances_per_webshop"`
-	DebugScreenshots            bool   `json:"debug_screenshots"`
+	CaptchaSolverEndpoint            string `json:"captcha_solver_endpoint"`
+	CheckoutInstancesPerWebshop      int    `json:"checkout_instances_per_webshop"`
+	DebugScreenshots                 bool   `json:"debug_screenshots"`
+	CheckoutSessionKeepAliveInterval int    `json:"checkout_session_keepalive_interval"`
 
 	AmazonStockCheckInterval          int    `json:"amazon_stock_check_interval"`
 	AmazonStockCheckIntervalDeviation int    `json:"amazon_stock_check_interval_deviation"`

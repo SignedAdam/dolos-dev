@@ -559,7 +559,7 @@ func KeepUserSessionAlive(webdriver selenium.WebDriver, globalConfig structs.Glo
 		}
 	*/
 
-	passwordText, err := webdriver.FindElement(selenium.ByCSSSelector, "ap_password")
+	passwordText, err := webdriver.FindElement(selenium.ByCSSSelector, "#ap_password")
 	if err != nil {
 		//return fmt.Errorf("Failed to find password field (%v)", err)
 

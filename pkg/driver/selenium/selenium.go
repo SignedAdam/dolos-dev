@@ -411,7 +411,7 @@ func (handler *SeleniumHandler) sessionKeepAlive(ctx context.Context, globalConf
 			}
 			handler.Unlock()
 
-			time.Sleep(time.Minute * 15)
+			time.Sleep(time.Second * time.Duration(globalConfig.CheckoutSessionKeepAliveInterval))
 		}
 	}
 }
