@@ -2,6 +2,7 @@
     "captcha_solver_endpoint": "http://142.196.182.123:5000/solve",
     "checkout_instances_per_webshop": 1,
     "debug_screenshots": false,
+    "checkout_session_keepalive_interval": 420,
 
     "amazon_stock_check_interval": 300,
     "amazon_stock_check_interval_deviation": 100,
