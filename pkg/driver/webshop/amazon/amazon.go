@@ -164,6 +164,13 @@ func (shop *Webshop) CheckoutSidebar(useAddToCartButton bool, product structs.Pr
 			continue
 		}
 		if inStock {
+			/*
+				//remove overlapping element
+				overlappingElements, err := webdriver.FindElements(selenium.ByCSSSelector, "#condition-text-block-title-text")
+				for _, overlappingElement := range overlappingElements {
+					webdriver.ExecuteScript("arguments[0].style.visibility='hidden'", []interface{}{overlappingElement})
+				}
+			*/
 			err = checkout(webdriver, product, *addToCartButton)
 			if err != nil {
 				return err
@@ -267,8 +274,11 @@ func checkOffer(webdriver selenium.WebDriver, productURL structs.ProductURL, par
 		priceString = strings.ReplaceAll(priceString, "$", "")
 		priceString = strings.ReplaceAll(priceString, "€", "")
 	*/
+	priceString = strings.ReplaceAll(priceString, ",", "")
+
 	price, err := strconv.ParseFloat(priceString, 32)
 	if err != nil {
+		fmt.Println("Failed to parse price to float: ", priceString)
 		return false, nil, err
 	}
 
@@ -422,13 +432,20 @@ func (shop *Webshop) CheckStockSidebar(webdriver selenium.WebDriver, productURL 
 }
 
 func checkout(webdriver selenium.WebDriver, product structs.ProductURL, addToCartButton selenium.WebElement) error {
-	var errContinueBtn error = nil
-	//click add to cart
-	err := addToCartButton.Click()
+
+	_, err := webdriver.ExecuteScript("arguments[0].click();", []interface{}{addToCartButton})
 	if err != nil {
-		return fmt.Errorf("Failed to click add to cart  button for product %s (%v)", product.Name, err)
+		return err
 	}
 
+	var errContinueBtn error = nil
+	//click add to cart
+	/*
+		err := addToCartButton.Click()
+		if err != nil {
+			return fmt.Errorf("Failed to click add to cart  button for product %s (%v)", product.Name, err)
+		}
+	*/
 	//url to go directly to checkout
 	webdriver.Get(fmt.Sprint("https://www.amazon", getCountryCode(product.URL), "/-/en/gp/cart/view.html/ref=lh_co?ie=UTF8&proceedToCheckout.x=129&cartInitiateId=1616029244603&hasWorkingJavascript=1"))
 
@@ -444,7 +461,6 @@ func checkout(webdriver selenium.WebDriver, product structs.ProductURL, addToCar
 	}
 
 	elemPlaceOrder.Click()
-
 	return nil
 }
 
