@@ -175,6 +175,7 @@ func (shop *Webshop) CheckoutSidebar(useAddToCartButton bool, product structs.Pr
 			if err != nil {
 				return err
 			}
+			return nil
 		}
 	}
 

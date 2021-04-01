@@ -161,8 +161,8 @@ func (handler *StockAlertHandler) stockChecker(wgSeleniumExit *sync.WaitGroup, c
 									if product.ID == productURL.ID {
 										product.CurrentPurchases++
 										if product.CurrentPurchases >= product.MaxPurchases {
-											helperfuncs.Log(handler.addMetrics("Completed purchase quota for product %s. Stopping task", taskID), productURL.Name)
 											handler.mutex.Unlock()
+											helperfuncs.Log(handler.addMetrics("Completed purchase quota for product %s. Stopping task", taskID), productURL.Name)
 											seleniumSession.Webdriver.Quit()
 											wgSeleniumExit.Done()
 											return
