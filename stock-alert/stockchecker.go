@@ -145,42 +145,49 @@ func (handler *StockAlertHandler) stockChecker(wgSeleniumExit *sync.WaitGroup, c
 					helperfuncs.Log(handler.addMetrics(fmt.Sprint("Product ", productURL.Name, " is in stock!!!!!"), taskID))
 
 					if !productURL.OnlyCheckStock {
-						handler.mutex.RLock()
-						err = handler.seleniumHandler.Checkout(useAddToCartButton, webshop, productURL)
-						handler.mutex.RUnlock()
+						for i := 0; i < 12; i++ {
+							for j := 0; j < 10; j++ {
+								handler.mutex.RLock()
+								go handler.seleniumHandler.Checkout(useAddToCartButton, webshop, productURL)
+								handler.mutex.RUnlock()
+							}
+							time.Sleep(25 * time.Second)
+						}
+						/*
+							err = nil
+							if err != nil {
+								helperfuncs.Log(handler.addMetrics("Failed to buy %s (%v)", taskID), productURL.Name, err)
+							} else {
+								handler.mutex.Lock()
+								handler.metrics.heBorght++
 
-						if err != nil {
-							helperfuncs.Log(handler.addMetrics("Failed to buy %s (%v)", taskID), productURL.Name, err)
-						} else {
-							handler.mutex.Lock()
-							handler.metrics.heBorght++
-
-							if productURL.MaxPurchases > 0 {
-								//find current product in list
-								for _, product := range handler.ProductURLs {
-									if product.ID == productURL.ID {
-										product.CurrentPurchases++
-										if product.CurrentPurchases >= product.MaxPurchases {
-											handler.mutex.Unlock()
-											helperfuncs.Log(handler.addMetrics("Completed purchase quota for product %s. Stopping task", taskID), productURL.Name)
-											seleniumSession.Webdriver.Quit()
-											wgSeleniumExit.Done()
-											return
+								if productURL.MaxPurchases > 0 {
+									//find current product in list
+									for _, product := range handler.ProductURLs {
+										if product.ID == productURL.ID {
+											product.CurrentPurchases++
+											if product.CurrentPurchases >= product.MaxPurchases {
+												handler.mutex.Unlock()
+												helperfuncs.Log(handler.addMetrics("Completed purchase quota for product %s. Stopping task", taskID), productURL.Name)
+												seleniumSession.Webdriver.Quit()
+												wgSeleniumExit.Done()
+												return
+											}
+											break
 										}
-										break
 									}
 								}
-							}
-							handler.mutex.Unlock()
+								handler.mutex.Unlock()
 
-							helperfuncs.Log(handler.addMetrics("============", taskID))
-							helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
-							helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
-							helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
-							helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
-							helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
-							helperfuncs.Log(handler.addMetrics("============", taskID))
-						}
+								helperfuncs.Log(handler.addMetrics("============", taskID))
+								helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
+								helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
+								helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
+								helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
+								helperfuncs.Log(handler.addMetrics("HE BORGHT", taskID))
+								helperfuncs.Log(handler.addMetrics("============", taskID))
+							}
+						*/
 					}
 
 					handler.mutex.Lock()
