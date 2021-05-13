@@ -1,5 +1,5 @@
 {
-    "captcha_solver_endpoint": "http://142.196.182.123:5000/solve",
+    "captcha_solver_endpoint": "NOT SET",
     "checkout_instances_per_webshop": 1,
     "debug_screenshots": false,
     "checkout_session_keepalive_interval": 420,
@@ -8,7 +8,7 @@
     "amazon_stock_check_interval_deviation": 100,
     "amazon_use_proxies": true,
     "amazon_proxy_lifetime": 99999,
-    "amazon_username": "SuperCharged@hotmail.be",
-    "amazon_password": "MSxehSzRIjw1"
+    "amazon_username": "NOT SET",
+    "amazon_password": "NOT SET"
 
 }
